@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# store here all configuration options for kura snap
+
+# read configured settings first
+SETTINGS_FILE="$SNAP_COMMON/snap_settings.sh"
+[ -f $SETTINGS_FILE ] && . $SETTINGS_FILE
+
+# list of supported keys
+keys="KURA_HTTP_PORT"
+
+# default values
+DESCRIPTION_KURA_HTTP_PORT="http port kura  is exposed on, atter change restart service"
+DEFAULT_KURA_HTTP_PORT="8080"
+KEY_KURA_HTTP_PORT="http-port"
+

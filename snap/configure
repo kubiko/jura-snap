@@ -1,0 +1,135 @@
+#!/bin/bash
+
+set -x
+
+exec >> $SNAP_COMMON/configure-hook.log 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S') configure-hook: Entering hook"
+
+populate_writable_data() {
+  mkdir -p ${SNAP_DATA}/log
+  mkdir -p ${SNAP_DATA}/run
+  mkdir -p ${SNAP_COMMON}/console
+  mkdir -p ${SNAP_COMMON}/packages
+  mkdir -p ${SNAP_COMMON}/.data
+  if [ ! -d ${SNAP_COMMON}/conf ]; then
+      mkdir -p ${SNAP_COMMON}/conf
+      cp ${SNAP}/kura/kura/kura*.properties ${SNAP_COMMON}/conf
+      cp ${SNAP}/kura/kura/dpa*.properties ${SNAP_COMMON}/conf
+      cp ${SNAP}/kura/kura/log*.properties ${SNAP_COMMON}/conf
+  fi
+
+  cp ${SNAP}/kura/install/recover_default_config.init ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
+  chmod +x ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
+
+  mkdir -p ${SNAP_COMMON}/etc/bind
+  cp ${SNAP}/kura/install/named.conf ${SNAP_COMMON}/etc/bind
+  sed -i 's#/etc/bind/#${SNAP_COMMON}/etc/bind/#g' ${SNAP_COMMON}/etc/bind/*
+  sed -i -e 's#/var/named#${SNAP_COMMON}/named#g' \
+         -e 's#/var/log/named.log#{SNAP_DATA}/log/named.log#g' \
+         -e 's#/etc/named#{SNAP_COMMON}/etc/bind/named#g' \
+         ${SNAP_COMMON}/etc/bind/named.conf
+  mkdir -p ${SNAP_COMMON}/named
+  touch {SNAP_DATA}/log/named.log
+  cp ${SNAP}/kura/install/named.ca ${SNAP_COMMON}/named/
+  cp ${SNAP}/kura/install/named.rfc1912.zones ${SNAP_COMMON}/etc/bind/named.rfc1912.zones
+  if [ ! -f " ${SNAP_COMMON}/etc/bind/rndc.key" ] ; then
+  	rndc-confgen -r /dev/urandom -a -c ${SNAP_COMMON}/etc/named.iscdlv.key
+  fi
+
+  mac_addr=$(head -1 /sys/class/net/eth0/address | tr '[:lower:]' '[:upper:]')
+  sed "s/^ssid=kura_gateway.*/ssid=kura_gateway_${mac_addr}/" < ${SNAP}/kura/install/hostapd.conf > ${SNAP_COMMON}/etc/hostapd-wlan0.conf
+  cp ${SNAP_COMMON}/etc/hostapd-wlan0.conf ${SNAP_COMMON}/.data/hostapd-wlan0.conf
+
+  cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/etc/dhcpd-eth0.conf
+  cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/.data/dhcpd-eth0.conf
+
+  cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/etc/dhcpd-wlan0.conf
+  cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/.data/dhcpd-wlan0.conf
+
+  if [ ! -d ${SNAP_COMMON}/data ]; then
+      cp -r ${SNAP}/kura/data ${SNAP_COMMON}
+      cp ${SNAP}/kura/install/kuranet.conf ${SNAP_COMMON}/data/kuranet.conf
+      cp ${SNAP}/kura/install/kuranet.conf ${SNAP_COMMON}/.data/kuranet.conf
+  fi
+
+  # copy ${SNAP}/etc/network/if* to /etc/network, we can write there,
+  # and Ubuntu core won't do anything with those scripts anyway
+  #  cp -r $SNAP/etc/network/if-* /etc/network
+
+
+  mkdir -p ${SNAP_COMMON}/etc/sysconfig
+  cp ${SNAP}/kura/install/iptables.init ${SNAP_COMMON}/etc/sysconfig/iptables
+  cp /etc/sysconfig/iptables ${INSTALL_DIR}/kura/.data/iptables
+
+}
+
+fix_file_paths() {
+  # corect paths in properties
+  sed -i -e 's#appender.kura.File=.*/kura.log#appender.kura.File='"${SNAP_DATA}"'/log/kura.log#g' \
+         -e 's#appender.kura.RollingPolicy.ActiveFileName=.*/kura.log#appender.kura.RollingPolicy.ActiveFileName='"${SNAP_DATA}"'/log/kura.log#g' \
+         -e 's#appender.kura.RollingPolicy.FileNamePattern=.*#appender.kura.RollingPolicy.FileNamePattern='"${SNAP_DATA}"'/log/kura-%i.log.gz#g' \
+         ${SNAP_COMMON}/conf/log*.properties
+  sed -i -e 's#kura.home=/.*#kura.home='"${SNAP}"'/kura/kura#g' \
+         -e 's#kura.plugins=/.*#kura.plugins='"${SNAP}"'/kura/kura/plugins#g' \
+         -e 's#kura.packages=/.*#kura.packages='"${SNAP_COMMON}"'/packages#g' \
+         -e 's#kura.data=/.*#kura.data='"${SNAP_COMMON}"'/data#g' \
+         -e 's#kura.tmp=/.*#kura.tmp='"${SNAP_DATA}"'/tmp#g' \
+         -e 's#kura.snapshots=/.*#kura.snapshots='"${SNAP_COMMON}"'/data/snapshots#g' \
+         -e 's#kura.style.dir=/.*#kura.style.dir='"${SNAP_COMMON}"'/console/skin#g' \
+         ${SNAP_COMMON}/conf/kura.properties
+}
+
+# configure hook can be called as result of: snap set / install / update / rollback. Handle each independently
+# version key to track reason for configure hook call
+LAST_REVISION=$(snapctl get revision)
+# this is revision before last installed one, used to track rollback
+REVERT_REVISION=$(snapctl get rev-revision)
+
+# handle bug when snap uninstall will not clear value of 'revision' key
+if [ "x$LAST_REVISION" == "x$SNAP_REVISION" ] &&  [ -d $SNAP_DATA/userdata ]; then
+    echo "Handle config change"
+    # read openhab config
+    . $SNAP/bin/config
+    # settings were altered by user, safest way to get them applied is to restart service
+
+    # TODO: remove this workaround once it's not needed
+    # for the moment we can't read settings outside of the hook,
+    # so store all settings in helpper script which is then picked by main wrapper
+    echo -e "#!/bin/sh\n" > $SETTINGS_FILE
+    for key in ${keys[@]}
+    do
+      # snappy is picky about key syntax, using mapping
+      MAP_KEY="KEY_$key"
+      if value=$(snapctl get ${!MAP_KEY}); then
+          echo "export $key='$value'" >> $SETTINGS_FILE
+      elif [ -d "${!key}" ]; then
+          # store back value from SETTINGS_FILE
+          echo "export $key='${!key}'" >> $SETTINGS_FILE
+      fi
+    done
+
+    # set file executable
+    chmod 755 $SETTINGS_FILE
+    # we can't use snapctl to restart service, may be one day ....
+    echo "Setting has been updated, restart service. $ sudo openhab.stop"
+elif [ "x$LAST_REVISION" == "x" ] || [ ! -d $SNAP_COMMON/conf ]; then
+    # this is fresh install or previus version has no userdata
+    echo "detected fresh install or missing previous user data, populate with fresh one"
+    populate_writable_data
+    fix_file_paths
+elif [ "x$LAST_REVISION" != "x$SNAP_REVISION" ] && [ "x$REVERT_REVISION" == "x$SNAP_REVISION" ]; then
+    # this is rollback: update logging properties
+    echo "detected rollback"
+    # update file paths
+    fix_file_paths
+    # empty previous revision key
+    snapctl set rev-revision=""
+elif [ "x$LAST_REVISION" != "x$SNAP_REVISION" ]; then
+    # this is update:  update logging properties
+    echo "detected udpate"
+    fix_file_paths
+    # add here more custom migration steps
+    # update revert revision key
+    snapctl set rev-revision=$LAST_REVISION
+fi
+snapctl set revision=$SNAP_REVISION

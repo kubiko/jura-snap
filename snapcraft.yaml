@@ -1,0 +1,101 @@
+name: kura
+version: "3.0.0"
+summary: kura
+description: |
+ kura
+
+confinement: strict
+grade: stable
+
+apps:
+#    service:
+#        command: kura-control start_kura_backgroud.sh
+#        daemon: simple
+#        plugs: [home, network, network-bind]
+
+    kura:
+        command: kura-control start_kura.sh
+        plugs: [home, network, network-bind]
+
+    kura-debug:
+        command: kura-control start_kura_debug.sh
+        plugs: [home, network, network-bind]
+
+parts:
+    # java run time
+    kura:
+        plugin: maven
+        # source: https://github.com/eclipse/kura.git
+        source: https://github.com/kubiko/kura.git
+        source-branch: develop
+        # source-branch: release-2.1.0
+        stage-packages: [ openjdk-8-jre, libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
+        # run own customised build, we are using apu-debian for the moment
+        build: |
+            ./build-all.sh -Papu-debian '-P!apu-debian-nn' '-P!beaglebone' '-P!beaglebone-nn' '-P!can' '-P!dev-env' '-P!dio.skip' '-P!extra-dps' '-P!fedora25' '-P!fedora25-nn' '-P!intel-edison' '-P!intel-edison-nn' '-P!raspberry-pi' -Praspberry-pi-2-3 '-P!raspberry-pi-2-3-nn' '-P!raspberry-pi-bplus' '-P!raspberry-pi-bplus-nn' '-P!raspberry-pi-nn' '-P!tools' -Pweb '-P!Win64-nn'
+        install: |
+            # first we need to unpack build package
+            unzip kura/distrib/target/kura_*_pcengines-apu.zip -d $SNAPCRAFT_PART_INSTALL/
+            mv $SNAPCRAFT_PART_INSTALL/kura_* $SNAPCRAFT_PART_INSTALL/kura
+            chmod +x $SNAPCRAFT_PART_INSTALL/kura/bin/*
+            # once config.ini is copied, we need to edit it at run time, before using it, add sed to start scripts
+            awk -i inplace \
+                  '1;/\/kura\/config.ini/{ print \
+                  "sed -i -e '\''s#\\.\\./plugins/#'\''\"${SNAP}\"'\''/kura/plugins/#g'\'' \\\n\
+                   -e '\''s#/home/root/eclipse/kura#'\''\"${SNAP}\"'\''/kura#g'\'' \\\n\
+                   -e '\''s#/opt/eclipse/kura#'\''\"${SNAP}\"'\''/kura#g'\'' \\\n\
+                   -e '\''s#osgi.instance.area=.*#osgi.instance.area='\''\"${SNAP_COMMON}\"'\''/data#'\'' \\\n\
+                   -e '\''s#org.osgi.framework.storage=.*#org.osgi.framework.storage='\''\"${SNAP_COMMON}\"'\''/data#g'\'' \\\n\
+                   -e '\''s#${native.tag}#'\''\"$(arch)\"'\''#g'\'' \
+                  /tmp/.kura/configuration/config.ini"}' \
+                  $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
+            # correct file paths, to use Ubuntu core friendly writable paths
+            # tweak some config settings
+            sed -i -e 's#-consoleLog >> /var/log/kura-.*#-consoleLog#g' \
+                   -e 's#/tmp/.kura#${SNAP_DATA}/tmp#g' \
+                   -e 's#${DIR}/data#${SNAP_COMMON}/data#g' \
+                   -e 's#/var/log#${SNAP_DATA}/log#g' \
+                   -e 's#-Dkura.configuration\=.*#-Dkura.configuration=file:${SNAP_COMMON}/conf/kura.properties \\#g' \
+                   -e 's#-Dkura.custom.configuration\=.*#-Dkura.custom.configuration=file:${SNAP_COMMON}/conf/kura_custom.properties \\#g' \
+                   -e 's#-Ddpa.configuration\=.*#-Ddpa.configuration=${SNAP_COMMON}/conf/dpa.properties \\#g' \
+                   -e 's#-Dlog4j.configuration\=.*#-Dlog4j.configuration=file:${SNAP_COMMON}/conf/log4j.properties \\#g' \
+                   -e 's#-Dkura.os.version\=.*#-Dkura.os.version=ubuntucore \\#g' \
+                   -e 's#-Dtarget.device\=.*#-Dtarget.device=core \\#g' \
+                   $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
+            # copy in correct usb.{architecture}.jar
+            cp kura/distrib/target/plugins/org.eclipse.kura.linux.usb.*.jar $SNAPCRAFT_PART_INSTALL/kura/kura/plugins
+            sed -i 's#org.eclipse.kura.linux.usb.armv6hf_1.0.9-SNAPSHOT.jar#org.eclipse.kura.linux.usb.x86_64-1.0.9-SNAPSHOT.jar#g' \
+                   $SNAPCRAFT_PART_INSTALL/kura/kura/config.ini
+            # fix environment dependencies
+            ln -sf libudev.so.1 $SNAPCRAFT_PART_INSTALL/lib/$(arch)-linux-gnu/libudev.so.0
+            # copy install artefacts
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/firewall.init $SNAPCRAFT_PART_INSTALL/etc/init.d/firewall
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/firewall.init $SNAPCRAFT_PART_INSTALL/etc/init.d/firewall_cust
+            chmod +x $SNAPCRAFT_PART_INSTALL/etc/init.d/firewall*
+            mkdir -p $SNAPCRAFT_PART_INSTALL/etc/sysconfig/
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/iptables.init $SNAPCRAFT_PART_INSTALL/etc/sysconfig/iptables
+            mkdir -p $SNAPCRAFT_PART_INSTALL/etc/network/if-up.d \
+                     $SNAPCRAFT_PART_INSTALL/etc/network/if-down.d
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/ifup-local.debian $SNAPCRAFT_PART_INSTALL/etc/network/if-up.d/ifup-local
+            sed -i -e 's#/etc/network/interfaces#${SNAP}/etc/network/interfaces#g' SNAPCRAFT_PART_INSTALL/etc/network/if-up.d/ifup-local
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/ifdown-local $SNAPCRAFT_PART_INSTALL/etc/network/if-down.d/ifdown-local
+            find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i -e 's#/tmp/.kura#${SNAP_DATA}/tmp#g' {} \;
+            find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec chmod +x {} \;
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/network.interfaces.debian $SNAPCRAFT_PART_INSTALL/etc/network/interfaces
+            # fix bind9 and dependencies
+            sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
+                   -e 's#/run/named/#{SNAP_DATA}/named#g' \
+                   -e 's#/run/named#{SNAP_DATA}/run/named#g' \
+                   -e 's|chown.*|# chown: not allowed from snap|g' \
+                   $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
+            awk -i inplace '1;/RESOLVCONF=no/{ print "echo \"SNAP=${SNAP}\""}' \
+                   $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
+    # helper scripts
+    kura-control:
+        source: snap
+        plugin: dump
+        organize:
+            kura-control: bin/kura-control
+            config: bin/config
+            kura-help: bin/kura-help
+            configure: meta/hooks/configure

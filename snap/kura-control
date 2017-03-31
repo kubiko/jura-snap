@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# read openhab config
+source $SNAP/bin/config
+
+# read settings if available
+# TODO: uncomment following, once snapctl can be called from outside the hooks
+# list of supported keys
+# keys=("OPENHAB_HTTP_PORT" "OPENHAB_HTTPS_PORT")
+# for key in ${keys[@]}
+# do
+#   # snappy is picky about key syntax, using mapping
+#   MAP_KEY="KEY_$key"
+#   SNAPPY_KEY=
+#   if value=$(snapctl get ${!MAP_KEY}); then
+#       echo "$key='$value'"
+#       export $key=$value
+#   fi
+# done
+
+# TODO: get rid of this workaround once above can be used
+# loop through all values, and if not defined, use default value
+for key in ${keys[@]}
+do
+  if [ "x" == "x${!key}" ]; then
+      # use default value
+      default_value="DEFAULT_$key"
+      # echo "using default value: $key='${!default_value}'"
+      export $key=${!default_value}
+  else
+      echo "$key='${!key}'"
+  fi
+done
+
+mkdir -p ${SNAP_DATA}/log
+mkdir -p ${SNAP_DATA}/run
+mkdir -p ${SNAP_COMMON}/console
+mkdir -p ${SNAP_COMMON}/packages
+if [ ! -d ${SNAP_COMMON}/conf ]; then
+    mkdir -p ${SNAP_COMMON}/conf
+    cp ${SNAP}/kura/kura/kura*.properties ${SNAP_COMMON}/conf
+    cp ${SNAP}/kura/kura/dpa*.properties ${SNAP_COMMON}/conf
+    cp ${SNAP}/kura/kura/log*.properties ${SNAP_COMMON}/conf
+    sed '#/var/log/kura#'"${SNAP_DATA}"'/log/kura#g' ${SNAP_COMMON}/conf/log*.properties
+fi
+
+if [ ! -d ${SNAP_COMMON}/data ]; then
+    cp -r ${SNAP}/kura/data ${SNAP_COMMON}
+fi
+
+JAVA_HOME=${SNAP}/usr/lib/jvm/java-8-openjdk-$SNAP_ARCH
+PATH=${SNAP}/usr/lib/jvm/java-8-openjdk-$SNAP_ARCH/bin:$PATH
+
+DIRNAME=$SNAP
+exec "${DIRNAME}/kura/bin/$1"
