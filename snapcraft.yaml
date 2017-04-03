@@ -60,19 +60,17 @@ apps:
 parts:
     # java run time
     kura:
-        plugin: maven
+        # use custom pluging, it will build what we need
+        plugin: kura
         # source: https://github.com/eclipse/kura.git
         source: https://github.com/kubiko/kura.git
         source-branch: develop
-        # source-branch: release-2.1.0
         stage-packages: [ openjdk-8-jre, libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
         build-packages: [unzip]
-        # run own customised build, we are using apu-debian for the moment
-        build: |
-            ./build-all.sh -Papu-debian '-P!apu-debian-nn' '-P!beaglebone' '-P!beaglebone-nn' '-P!can' '-P!dev-env' '-P!dio.skip' '-P!extra-dps' '-P!fedora25' '-P!fedora25-nn' '-P!intel-edison' '-P!intel-edison-nn' '-P!raspberry-pi' -Praspberry-pi-2-3 '-P!raspberry-pi-2-3-nn' '-P!raspberry-pi-bplus' '-P!raspberry-pi-bplus-nn' '-P!raspberry-pi-nn' '-P!tools' -Pweb '-P!Win64-nn'
+        # run custom post build steps
         install: |
             # first we need to unpack build package
-            unzip kura/distrib/target/kura_*_pcengines-apu.zip -d $SNAPCRAFT_PART_INSTALL/
+            # unzip kura/distrib/target/kura_*_pcengines-apu.zip -d $SNAPCRAFT_PART_INSTALL/
             mv $SNAPCRAFT_PART_INSTALL/kura_* $SNAPCRAFT_PART_INSTALL/kura
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/bin/*
             # once config.ini is copied, we need to edit it at run time, before using it, add sed to start scripts
