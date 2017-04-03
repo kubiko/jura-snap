@@ -1,5 +1,5 @@
 name: kura
-version: "3.0.0"
+version: "3.0.0-SNAPSHOT"
 summary: kura
 description: |
  kura
@@ -11,15 +11,51 @@ apps:
 #    service:
 #        command: kura-control start_kura_backgroud.sh
 #        daemon: simple
-#        plugs: [home, network, network-bind]
+#        plugs:
+#            - home
+#            - io-ports-control
+#            - hardware-observe
+#            - firewall-control
+#            - network-bind
+#            - network-control
+#            - network-manager
+#            - network-setup-control
+#            - process-control
+#            - removable-media
+#            - system-observe
+#            - time-control
 
     kura:
         command: kura-control start_kura.sh
-        plugs: [home, network, network-bind]
+        plugs:
+            - home
+            - io-ports-control
+            - hardware-observe
+            - firewall-control
+            - network-bind
+            - network-control
+            - network-manager
+            - network-setup-control
+            - process-control
+            - removable-media
+            - system-observe
+            - time-control
 
     kura-debug:
         command: kura-control start_kura_debug.sh
-        plugs: [home, network, network-bind]
+        plugs:
+            - home
+            - io-ports-control
+            - hardware-observe
+            - firewall-control
+            - network-bind
+            - network-control
+            - network-manager
+            - network-setup-control
+            - process-control
+            - removable-media
+            - system-observe
+            - time-control
 
 parts:
     # java run time
@@ -30,6 +66,7 @@ parts:
         source-branch: develop
         # source-branch: release-2.1.0
         stage-packages: [ openjdk-8-jre, libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
+        build-packages: [unzip]
         # run own customised build, we are using apu-debian for the moment
         build: |
             ./build-all.sh -Papu-debian '-P!apu-debian-nn' '-P!beaglebone' '-P!beaglebone-nn' '-P!can' '-P!dev-env' '-P!dio.skip' '-P!extra-dps' '-P!fedora25' '-P!fedora25-nn' '-P!intel-edison' '-P!intel-edison-nn' '-P!raspberry-pi' -Praspberry-pi-2-3 '-P!raspberry-pi-2-3-nn' '-P!raspberry-pi-bplus' '-P!raspberry-pi-bplus-nn' '-P!raspberry-pi-nn' '-P!tools' -Pweb '-P!Win64-nn'
@@ -46,7 +83,7 @@ parts:
                    -e '\''s#/opt/eclipse/kura#'\''\"${SNAP}\"'\''/kura#g'\'' \\\n\
                    -e '\''s#osgi.instance.area=.*#osgi.instance.area='\''\"${SNAP_COMMON}\"'\''/data#'\'' \\\n\
                    -e '\''s#org.osgi.framework.storage=.*#org.osgi.framework.storage='\''\"${SNAP_COMMON}\"'\''/data#g'\'' \\\n\
-                   -e '\''s#${native.tag}#'\''\"$(arch)\"'\''#g'\'' \
+                   -e '\''s#${native.tag}#'\''\"$(uname -i)\"'\''#g'\'' \
                   /tmp/.kura/configuration/config.ini"}' \
                   $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
             # correct file paths, to use Ubuntu core friendly writable paths
@@ -81,7 +118,7 @@ parts:
             cp $SNAPCRAFT_PART_INSTALL/kura/install/ifdown-local $SNAPCRAFT_PART_INSTALL/etc/network/if-down.d/ifdown-local
             find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i -e 's#/tmp/.kura#${SNAP_DATA}/tmp#g' {} \;
             find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec chmod +x {} \;
-            cp $SNAPCRAFT_PART_INSTALL/kura/install/network.interfaces.debian $SNAPCRAFT_PART_INSTALL/etc/network/interfaces
+            cp $SNAPCRAFT_PART_INSTALL/kura/install/network.interfaces.raspbian $SNAPCRAFT_PART_INSTALL/etc/network/interfaces
             # fix bind9 and dependencies
             sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
                    -e 's#/run/named/#{SNAP_DATA}/named#g' \
