@@ -64,8 +64,8 @@ parts:
         # source: https://github.com/eclipse/kura.git
         source: https://github.com/kubiko/kura.git
         source-branch: develop
-        stage-packages: [ openjdk-8-jre, libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
-        # build-packages: [unzip]
+        stage-packages: [libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
+        build-packages: [unzip]
         # run custom post build steps
         install: |
             # first we need to unpack build package
@@ -120,6 +120,16 @@ parts:
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
             awk -i inplace '1;/RESOLVCONF=no/{ print "echo \"SNAP=${SNAP}\""}' \
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
+
+    # java run time
+    jre:
+        plugin: zulu-jre
+        # zulu supported architectures(armhf, amd64) are already handled by plugin itself
+        # define here overide for pluging's defaults, or to add additional architectures
+        # example overide:
+        # zulu:
+        #     amd64: https://www.azul.com/downloads/zulu/zdk-8-ga-linux_x64.tar.gz
+
     # helper scripts
     kura-control:
         plugin: dump
