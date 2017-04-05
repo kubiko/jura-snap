@@ -19,7 +19,6 @@ class KuraPlugin(snapcraft.BasePlugin):
     def __init__(self, name, options, project):
         super().__init__(name, options, project)
         self.build_packages.append('maven')
-        self.build_packages.append('default-jdk')
         self.jredir = os.path.join(self.partdir, 'jre')
 
     def _use_proxy(self):
@@ -49,8 +48,8 @@ class KuraPlugin(snapcraft.BasePlugin):
         self.run(mvn_cmd +  ['-f','target-platform/pom.xml', 'install','-Dmaven.test.skip=true' ])
         self.run(mvn_cmd +  ['-f','kura/manifest_pom.xml', 'install','-Dmaven.test.skip=true' ])
         self.run(mvn_cmd +  ['-f','kura/pom_pom.xml', 'install','-Dmaven.test.skip=true' ])
-        self.run(mvn_cmd +  ['-f','kura/maven-central', 'install','-Dmaven.test.skip=true' ])
-        self.run(mvn_cmd +  ['-f','karaf/pom.xml', 'install','-Dmaven.test.skip=true' ])
+        # self.run(mvn_cmd +  ['-f','kura/maven-central', 'install','-Dmaven.test.skip=true' ])
+        # self.run(mvn_cmd +  ['-f','karaf/pom.xml', 'install','-Dmaven.test.skip=true' ])
         tree = ElementTree.parse(os.path.join(self.sourcedir, 'kura/manifest_pom.xml' ))
         root = tree.getroot()
 
@@ -64,7 +63,7 @@ class KuraPlugin(snapcraft.BasePlugin):
         dist_package = os.path.join(self.builddir, 'kura/distrib/target/kura_' + version + '_pcengines-apu.zip')
         sources.Zip(dist_package, self.builddir).pull()
         shutil.move(os.path.join(self.builddir, 'kura_' + version + '_pcengines-apu'), os.path.join(self.builddir, 'kura'))
-        shutil.copytree(os.path.join(self.builddir, 'kura'), self.installdir)
+        shutil.copytree(os.path.join(self.builddir, 'kura'), os.path.join(self.installdir, 'kura'))
         for filename in glob.glob(os.path.join(self.installdir, 'usb_plugins', 'org.eclipse.kura.linux.usb.*.jar')):
             shutil.move(filename, os.path.join(self.installdir, 'kura','kura','plugins'))
 
