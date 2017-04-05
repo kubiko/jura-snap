@@ -19,6 +19,7 @@ class KuraPlugin(snapcraft.BasePlugin):
     def __init__(self, name, options, project):
         super().__init__(name, options, project)
         self.build_packages.append('maven')
+        self.build_packages.append('default-jdk')
         self.jredir = os.path.join(self.partdir, 'jre')
 
     def _use_proxy(self):
