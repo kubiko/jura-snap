@@ -1,5 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 import os
+import glob
 import fileinput
 import sys
 import snapcraft
@@ -13,7 +14,7 @@ from xml.etree import ElementTree
 
 logger = logging.getLogger(__name__)
 
-class OpenHabPlugin(snapcraft.BasePlugin):
+class KuraPlugin(snapcraft.BasePlugin):
 
     def __init__(self, name, options, project):
         super().__init__(name, options, project)
@@ -28,17 +29,13 @@ class OpenHabPlugin(snapcraft.BasePlugin):
 
     def build(self):
         snapcraft.BasePlugin.build(self)
-
-        # mvn_cmd = ['mvn','-f','distributions/openhab/pom.xml', 'package']
-        # mvn_cmd = ['./build-all.sh', '-Papu-debian', '\'-P!apu-debian-nn\'', '\'-P!beaglebone\''
-        #           , '\'-P!beaglebone-nn\'', '\'-P!can\'', '\'-P!dev-env\'', '\'-P!dio.skip\''
-        #           , '\'-P!extra-dps\'', '\'-P!fedora25\'', '\'-P!fedora25-nn\'', '\'-P!intel-edison\''
-        #           , '\'-P!intel-edison-nn\'', '\'-P!raspberry-pi\'', '-Praspberry-pi-2-3'
-        #           , '\'-P!raspberry-pi-2-3-nn\'', '\'-P!raspberry-pi-bplus\'', '\'-P!raspberry-pi-bplus-nn\''
-        #           , '\'-P!raspberry-pi-nn\'', '\'-P!tools\'', '-Pweb', '\'-P!Win64-nn\'' ]
-        mvn_cmd = ['./build-all.sh',
-                   '-Papu-debian  -Pweb -Praspberry-pi-2-3 \'-P!apu-debian-nn\' \'-P!beaglebone\' \'-P!beaglebone-nn\' \'-P!can\' \'-P!dev-env\' \'-P!dio.skip\' \'-P!extra-dps\' \'-P!fedora25\' \'-P!fedora25-nn\' \'-P!intel-edison\' \'-P!intel-edison-nn\' \'-P!raspberry-pi\' \'-P!raspberry-pi-2-3-nn\' \'-P!raspberry-pi-bplus\' \'-P!raspberry-pi-bplus-nn\' \'-P!raspberry-pi-nn\' \'-P!tools\' \'-P!Win64-nn\'' ]
-
+        mvn_cmd = ['mvn', '-Papu-debian', '-Praspberry-pi-2-3', '-Pweb', '-P!apu-debian-nn'
+                  , '-P!beaglebone', '-P!beaglebone-nn', '-P!can', '-P!dev-env'
+                  , '-P!dio.skip', '-P!extra-dps', '-P!fedora25', '-P!fedora25-nn'
+                  , '-P!intel-edison', '-P!intel-edison-nn', '-P!raspberry-pi'
+                  , '-P!raspberry-pi-2-3-nn', '-P!raspberry-pi-bplus'
+                  , '-P!raspberry-pi-bplus-nn', '-P!raspberry-pi-nn', '-P!tools'
+                  , '-P!Win64-nn']
         if self._use_proxy():
             settings_path = os.path.join(self.partdir, 'm2', 'settings.xml')
             maven._create_settings(settings_path)
@@ -48,17 +45,29 @@ class OpenHabPlugin(snapcraft.BasePlugin):
             logger.warning('Setting up zulu jre for maven build')
             os.environ['JAVA_HOME'] = os.path.join(self.jredir, 'jre')
             os.environ['PATH'] = os.path.join(self.jredir, 'bin') + os.environ.get('PATH', 'not-set')
-
-        self.run(mvn_cmd, self.sourcedir)
-
-        tree = ElementTree.parse(os.path.join(self.sourcedir, 'kura/pom_pom.xml' ))
+        self.run(mvn_cmd +  ['-f','target-platform/pom.xml', 'install','-Dmaven.test.skip=true' ])
+        self.run(mvn_cmd +  ['-f','kura/manifest_pom.xml', 'install','-Dmaven.test.skip=true' ])
+        self.run(mvn_cmd +  ['-f','kura/pom_pom.xml', 'install','-Dmaven.test.skip=true' ])
+        self.run(mvn_cmd +  ['-f','kura/maven-central', 'install','-Dmaven.test.skip=true' ])
+        self.run(mvn_cmd +  ['-f','karaf/pom.xml', 'install','-Dmaven.test.skip=true' ])
+        tree = ElementTree.parse(os.path.join(self.sourcedir, 'kura/manifest_pom.xml' ))
         root = tree.getroot()
-        parent = root.find('{http://maven.apache.org/POM/4.0.0}project')
-        version = parent.find('{http://maven.apache.org/POM/4.0.0}version').text
 
-        dist_package = os.path.join(self.sourcedir, 'kura/distrib/target/kura_' + version + '_pcengines-apu.zip')
+        # pcengines-apu release seems to be missing usb libraries for different architectures
+        os.makedirs(os.path.join(self.installdir, 'usb_plugins'), exist_ok=True)
+        for fname in glob.glob(os.path.join(self.builddir, 'kura/distrib/target/plugins/org.eclipse.kura.linux.usb.*.jar')):
+            shutil.copy2(fname, os.path.join(self.installdir, 'usb_plugins'))
 
+        version = root.find('{http://maven.apache.org/POM/4.0.0}version').text
+        logger.warning('Using release version:'+version)
+        dist_package = os.path.join(self.builddir, 'kura/distrib/target/kura_' + version + '_pcengines-apu.zip')
         sources.Zip(dist_package, self.builddir).pull()
+        shutil.move(os.path.join(self.builddir, 'kura_' + version + '_pcengines-apu'), os.path.join(self.builddir, 'kura'))
+        shutil.copytree(os.path.join(self.builddir, 'kura'), self.installdir)
+        for filename in glob.glob(os.path.join(self.installdir, 'usb_plugins', 'org.eclipse.kura.linux.usb.*.jar')):
+            shutil.move(filename, os.path.join(self.installdir, 'kura','kura','plugins'))
+
+        shutil.rmtree(os.path.join(self.installdir, 'usb_plugins'))
         snapcraft.file_utils.link_or_copy_tree(
             self.builddir, self.installdir,
             copy_function=lambda src, dst: dump._link_or_copy(src, dst,
