@@ -63,6 +63,7 @@ parts:
         plugin: kura
         # source: https://github.com/eclipse/kura.git
         source: https://github.com/kubiko/kura.git
+        # source: /home/ubuntu/kura/kura/
         source-branch: develop
         stage-packages: [libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
         build-packages: [unzip]
@@ -120,7 +121,7 @@ parts:
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
             awk -i inplace '1;/RESOLVCONF=no/{ print "echo \"SNAP=${SNAP}\""}' \
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
-
+            chmod +x $SNAPCRAFT_PART_INSTALL/kura/bin/*
     # java run time
     jre:
         plugin: zulu-jre
