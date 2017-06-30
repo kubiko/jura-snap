@@ -66,7 +66,7 @@ parts:
         # source: /home/ubuntu/kura/kura/
         source-branch: develop
         stage-packages: [libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
-        build-packages: [unzip]
+        build-packages: [unzip, openjdk-8-jdk-headless]
         # run custom post build steps
         install: |
             # first we need to unpack build package
