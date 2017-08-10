@@ -1,5 +1,6 @@
 name: kura
-version: "3.0.0-SNAPSHOT"
+version: 0
+version-script: grep '^version=' prime/kura/kura/kura.properties | awk -F '=' '{ print $2}'
 summary: kura
 description: |
  kura
@@ -64,8 +65,8 @@ parts:
         # source: https://github.com/eclipse/kura.git
         source: https://github.com/kubiko/kura.git
         # source: /home/ubuntu/kura/kura/
-        source-branch: develop
-        stage-packages: [libudev1, bind9, hostapd, isc-dhcp-server, dos2unix, ethtool, telnet, wireless-tools]
+        source-branch: develop_rebase
+        stage-packages: [libudev1, bind9, hostapd, isc-dhcp-server, iw, monit, dos2unix, ethtool, telnet, wireless-tools]
         build-packages: [unzip, openjdk-8-jdk-headless]
         # run custom post build steps
         install: |
