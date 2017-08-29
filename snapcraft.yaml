@@ -61,18 +61,23 @@ apps:
 parts:
     kura:
         # use custom pluging, it will build what we need
-        plugin: kura
+        plugin: nil
         # source: https://github.com/eclipse/kura.git
         source: https://github.com/kubiko/kura.git
         # source: /home/ubuntu/kura/kura/
         source-branch: develop_rebase
         stage-packages: [libudev1, bind9, hostapd, isc-dhcp-server, iw, monit, dos2unix, ethtool, telnet, wireless-tools]
-        build-packages: [unzip, openjdk-8-jdk-headless]
+        build-packages: [unzip, openjdk-8-jdk-headless, maven]
         # run custom post build steps
+        build: |
+            ./build-all.sh $(mvn -N -f kura/distrib/pom.xml help:all-profiles | grep "Profile Id" \
+               | awk '{ if($3 == "apu-debian"){print "-P"$3}else{print "-P!"$3 }}' | sort -u | tr '\n' ' ')
         install: |
             # first we need to unpack build package
-            # unzip kura/distrib/target/kura_*_pcengines-apu.zip -d $SNAPCRAFT_PART_INSTALL/
-            # mv $SNAPCRAFT_PART_INSTALL/kura_* $SNAPCRAFT_PART_INSTALL/kura
+            # find  parts/kura/build/ -name 'kura_*_pcengines-apu.zip' --exec unzip {} -d $SNAPCRAFT_PART_INSTALL/ \;
+            unzip kura/distrib/target/kura_*_pcengines-apu.zip -d $SNAPCRAFT_PART_INSTALL/
+            mv $SNAPCRAFT_PART_INSTALL/kura_* $SNAPCRAFT_PART_INSTALL/kura
+            cp kura/distrib/target/plugins/org.eclipse.kura.linux.usb.*.jar $SNAPCRAFT_PART_INSTALL/kura/kura/plugins
             # chmod +x $SNAPCRAFT_PART_INSTALL/kura/bin/*
             # once config.ini is copied, we need to edit it at run time, before using it, add sed to start scripts
             awk -i inplace \
@@ -122,7 +127,6 @@ parts:
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
             awk -i inplace '1;/RESOLVCONF=no/{ print "echo \"SNAP=${SNAP}\""}' \
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
-            chmod +x $SNAPCRAFT_PART_INSTALL/kura/bin/*
     # java run time
     jre:
         plugin: zulu-jre
