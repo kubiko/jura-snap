@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -x
+
+exec >> $SNAP_COMMON/refresh-hook.log 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S') configure-hook: Entering hook"
+
+source $SNAP/meta/hooks/common
+
+# this is refresh
+fix_file_paths
