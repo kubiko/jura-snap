@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# store here all configuration options for kura snap
+# read configured settings first
+# list of supported keys
+keys="JAVA_MEMORY"
+
+# default values
+DESCRIPTION_JAVA_MEMORY="Memory settings passed to kura's java environment"
+DEFAULT_JAVA_MEMORY="512"
+KEY_JAVA_MEMORY='java-memory'

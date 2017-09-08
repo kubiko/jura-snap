@@ -29,6 +29,9 @@ apps:
         command: kura/bin/start_kura_debug.sh
         plugs: *default-plugs
 
+    help:
+        command: snap/help
+
 parts:
     kura:
         # use custom pluging, it will build what we need
@@ -107,7 +110,11 @@ parts:
                    -e 's#-Dkura.os.version\=.*#-Dkura.os.version=ubuntucore \\#g' \
                    -e 's#-Dtarget.device\=.*#-Dtarget.device=core \\#g' \
                    -e 's#/var/run/kura.pid#/$SNAP_DATA/run/kura.pid#g' \
+                   -e 's#Xms512m#Xms$(if value=$(snapctl get java-memory) \&\& [ "x$value" = "x" ]; then echo $DEFAULT_JAVA_MEMORY; else echo $value;fi)m#g' \
+                   -e 's#Xmx512m#Xmx$(if value=$(snapctl get java-memory) \&\& [ "x$value" = "x" ]; then echo $DEFAULT_JAVA_MEMORY; else echo $value;fi)m#g' \
                    $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
+            awk -i inplace \
+                  '1;/\/kura\/config.ini/{ print ". $SNAP/snap/config"}' $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/install/*.raspbian
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/install/*.init
         organize:
@@ -118,6 +125,17 @@ parts:
             kura/install/ifup-local.debian: etc/network/if-up.d/ifup-local
             kura/install/ifdown-local: etc/network/if-down.d/ifdown-local
             kura/install/network.interfaces.raspbian: etc/network/interfaces
+
+    # start-stop-daemon
+    start-stop-daemon:
+        plugin: nil
+        stage-packages:
+            - dpkg
+        stage:
+            - -urs
+            - -var
+            - -etc
+
     # network
     net:
         plugin: nil
@@ -147,3 +165,9 @@ parts:
         # zulu:
         #     amd64: https://www.azul.com/downloads/zulu/zdk-8-ga-linux_x64.tar.gz
 
+    helpers:
+        plugin: dump
+        source: snap
+        organize:
+            config: snap/config
+            help: snap/help
