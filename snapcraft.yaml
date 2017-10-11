@@ -45,7 +45,7 @@ parts:
             - telnet
             - monit
             - coreutils
-        build-packages: [unzip, openjdk-8-jdk-headless, maven]
+        build-packages: [unzip, openjdk-8-jdk-headless, maven, gawk]
         # first tweak source for snap building
         prepare: |
             sed -i \
