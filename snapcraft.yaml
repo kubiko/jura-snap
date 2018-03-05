@@ -1,6 +1,9 @@
-name: kura-nn
-version: 0
-version-script: grep '^version=' prime/kura/kura/kura.properties | awk -F '=' '{ print $2}'
+name: kura
+version: "3.x"
+version-script: |
+    [ "x$(grep  -E '^version=.*SNAPSHOT'  prime/kura/kura/kura.properties)" != "x" ] \
+        && echo $(grep '^version=' prime/kura/kura/kura.properties | awk -F '=' '{ print $2}')-$(git --git-dir=parts/kura/build/.git describe --tags | awk -F '-' '{ print $2"-"$3}') \
+        || grep '^version=' prime/kura/kura/kura.properties | awk -F '=' '{ print $2}'
 summary: kura
 description: |
  kura
@@ -9,6 +12,23 @@ confinement: strict
 grade: stable
 
 apps:
+#    service:
+#        command: kura-control start_kura_backgroud.sh
+#        daemon: simple
+#        plugs:
+#            - home
+#            - io-ports-control
+#            - hardware-observe
+#            - firewall-control
+#            - network-bind
+#            - network-control
+#            - network-manager
+#            - network-setup-control
+#            - process-control
+#            - removable-media
+#            - system-observe
+#            - time-control
+
     kura:
         command: kura/bin/start_kura.sh
         plugs: &default-plugs [home , io-ports-control, hardware-observe, firewall-control, network-bind, network-control, network-manager, network-setup-control, process-control, removable-media, system-observe, time-control]
@@ -19,18 +39,13 @@ apps:
         daemon: simple
         plugs: *default-plugs
 
-#    kura-monit:
-#        command: monit-init start
-#        stop-command: monit-init stop
-#        daemon: simple
-#        plugs: *default-plugs
 
     kura-debug:
         command: kura/bin/start_kura_debug.sh
         plugs: *default-plugs
 
     help:
-        command: snap/help
+        command: bin/help
 
 parts:
     kura:
@@ -43,9 +58,22 @@ parts:
             - libudev1
             - dos2unix
             - telnet
+            - minicom
+            - setserial
+            - powertop
+            - openvpn
             - monit
             - coreutils
-        build-packages: [unzip, openjdk-8-jdk-headless, maven, gawk]
+            - unzip
+            - inetutils-telnet
+            - socat
+            - usbutils
+            - nano
+        build-packages:
+            - unzip
+            - openjdk-8-jdk-headless
+            - maven
+            - gawk
         # first tweak source for snap building
         prepare: |
             sed -i \
@@ -110,11 +138,11 @@ parts:
                    -e 's#-Dkura.os.version\=.*#-Dkura.os.version=ubuntucore \\#g' \
                    -e 's#-Dtarget.device\=.*#-Dtarget.device=core \\#g' \
                    -e 's#/var/run/kura.pid#/$SNAP_DATA/run/kura.pid#g' \
-                   -e 's#Xms512m#Xms$(if value=$(snapctl get java-memory) \&\& [ "x$value" = "x" ]; then echo $DEFAULT_JAVA_MEMORY; else echo $value;fi)m#g' \
-                   -e 's#Xmx512m#Xmx$(if value=$(snapctl get java-memory) \&\& [ "x$value" = "x" ]; then echo $DEFAULT_JAVA_MEMORY; else echo $value;fi)m#g' \
+                   -e 's#-Xms[0-9]*m#-Xms${JAVA_MEMORY}m#g' \
+                   -e 's#-Xmx[0-9]*m#-Xmx${JAVA_MEMORY}m#g' \
                    $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
             awk -i inplace \
-                  '1;/\/kura\/config.ini/{ print ". $SNAP/snap/config"}' $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
+                  '1;/\/kura\/config.ini/{ print ". $SNAP/bin/read-config"}' $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/install/*.raspbian
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/install/*.init
         organize:
@@ -167,7 +195,4 @@ parts:
 
     helpers:
         plugin: dump
-        source: snap
-        organize:
-            config: snap/config
-            help: snap/help
+        source: scripts

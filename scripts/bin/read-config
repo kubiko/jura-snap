@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# read snap configuration
+. $SNAP/bin/config
+
+
+for key in ${keys}
+do
+    default_value="DEFAULT_$key"
+    description="DESCRIPTION_$key"
+    snappy_key="KEY_$key"
+    eval keyname="\$$snappy_key"
+    value=$(snapctl get ${keyname})
+    if [ "x$value" = "x" ]; then
+        eval defval="\$$default_value"
+        echo "$key=${defval} (default value)"
+        export $key=${defval}
+    else
+        echo "$key=$value"
+        export $key=$value
+    fi
+done
