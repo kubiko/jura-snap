@@ -11,6 +11,13 @@ description: |
 confinement: strict
 grade: stable
 
+plugs:
+  client:
+    interface: bluez
+slots:
+  service:
+    interface: bluez
+
 apps:
 #    service:
 #        command: kura-control start_kura_backgroud.sh
@@ -46,6 +53,20 @@ apps:
 
     help:
         command: bin/help
+
+    bluez:
+        command: "usr/lib/bluetooth/bluetoothd -E"
+        daemon: simple
+        plugs:
+            - uhid
+        slots:
+            - service
+
+    obex:
+        command: "usr/lib/bluetooth/obexd"
+        daemon: simple
+        slots:
+            - service
 
 parts:
     kura:
@@ -196,3 +217,46 @@ parts:
     helpers:
         plugin: dump
         source: scripts
+    bluez:
+        plugin: autotools
+        source: https://git.launchpad.net/~snappy-hwe-team/snappy-hwe-snaps/+git/bluez
+        source-type: git
+        source-branch: bluez/5.44
+        configflags:
+           - --prefix=/usr
+           - --libexec=/usr/lib/
+           - --enable-experimental
+           - --enable-threads
+           - --disable-cups
+           - --enable-obex
+           - --disable-systemd
+           - --disable-silent-rules
+           - --enable-test
+           - --enable-deprecated
+        build-packages:
+           - libglib2.0-dev
+           - libdbus-1-dev
+           - libical-dev
+           - libreadline6-dev
+           - libudev-dev
+           - udev
+           - pkg-config
+        stage-packages:
+           - libical1a
+        filesets:
+           libical1a:
+             - usr/lib/*/libical*
+        stage:
+           - usr/lib/bluetooth/bluetoothd
+           - usr/lib/bluetooth/obexd
+           - usr/bin/bluetoothctl
+           - usr/bin/obexctl
+           - usr/bin/hciconfig
+           - usr/bin/hcidump
+           - usr/bin/hciattach
+           - usr/bin/hcitool
+           - usr/bin/sdptool
+           - usr/bin/btmon
+           - usr/bin/btmgmt
+           - usr/share/doc/libical1a/copyright
+           - $libical1a
