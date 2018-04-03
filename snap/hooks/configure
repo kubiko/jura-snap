@@ -5,4 +5,4 @@ set -x
 exec >> $SNAP_COMMON/configure-hook.log 2>&1
 echo "$(date '+%Y-%m-%d %H:%M:%S') configure-hook: Entering hook"
 
-source $SNAP/meta/hooks/common
+source $SNAP/bin/hooks-common

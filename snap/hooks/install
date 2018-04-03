@@ -5,7 +5,7 @@ set -x
 exec >> $SNAP_COMMON/install-hook.log 2>&1
 echo "$(date '+%Y-%m-%d %H:%M:%S') configure-hook: Entering hook"
 
-source $SNAP/meta/hooks/common
+source $SNAP/bin/hooks-common
 
 # this is fresh install or previus version has no userdata
 echo "fresh install"

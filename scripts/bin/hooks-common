@@ -1,5 +1,11 @@
 #!/bin/bash
 
+populate_overlayed_file() {
+  target="$1"
+  [ -n "${2}" ] && source="${2}" || source="${1}"
+  [ "$(du ${SNAP_COMMON}/${target} | cut -c -1)" = "0" ] && $SNAP/${source} > ${SNAP_COMMON}/${target} || true
+}
+
 populate_writable_data() {
   mkdir -p ${SNAP_DATA}/log
   mkdir -p ${SNAP_DATA}/run
@@ -21,6 +27,8 @@ populate_writable_data() {
   cp ${SNAP}/kura/install/monitrc.raspbian ${SNAP_COMMON}/etc/monitrc
   chmod 700 ${SNAP_COMMON}/etc/monitrc
 
+
+  cp ${SNAP}/etc/bind/* ${SNAP_COMMON}/etc/bind
   cp ${SNAP}/kura/install/named.conf ${SNAP_COMMON}/etc/bind
   sed -i 's#/etc/bind/#${SNAP_COMMON}/etc/bind/#g' ${SNAP_COMMON}/etc/bind/*
   sed -i -e 's#/var/named#${SNAP_COMMON}/named#g' \
@@ -36,14 +44,15 @@ populate_writable_data() {
   	rndc-confgen -r /dev/urandom -a -c ${SNAP_COMMON}/etc/named.iscdlv.key
   fi
 
+
   mac_addr=$(head -1 /sys/class/net/eth0/address | tr '[:lower:]' '[:upper:]')
-  sed "s/^ssid=kura_gateway.*/ssid=kura_gateway_${mac_addr}/" < ${SNAP}/kura/install/hostapd.conf > ${SNAP_COMMON}/etc/hostapd-wlan0.conf
+  sed "s/^ssid=kura_gateway.*/ssid=kura_gateway_${mac_addr}/" < ${SNAP}/kura/install/hostapd.conf > ${SNAP_COMMON}/etc/hostapd/hostapd-wlan0.conf
   cp ${SNAP_COMMON}/etc/hostapd-wlan0.conf ${SNAP_COMMON}/.data/hostapd-wlan0.conf
 
-  cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/etc/dhcpd-eth0.conf
+  cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/etc/hostapd/dhcpd-eth0.conf
   cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/.data/dhcpd-eth0.conf
 
-  cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/etc/dhcpd-wlan0.conf
+  cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/etc/hostapd/dhcpd-wlan0.conf
   cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/.data/dhcpd-wlan0.conf
 
   if [ ! -d ${SNAP_COMMON}/data ]; then
@@ -52,15 +61,16 @@ populate_writable_data() {
       cp ${SNAP}/kura/install/kuranet.conf ${SNAP_COMMON}/.data/kuranet.conf
   fi
 
-  # copy ${SNAP}/etc/network/if* to /etc/network, we can write there,
-  # and Ubuntu core won't do anything with those scripts anyway
-  #  cp -r $SNAP/etc/network/if-* /etc/network
-
-
-  mkdir -p ${SNAP_COMMON}/etc/sysconfig
-  cp ${SNAP}/kura/install/iptables.init ${SNAP_COMMON}/etc/sysconfig/iptables
+  mkdir -p ${SNAP_COMMON}/etc/sysconfig/network-scripts
+  populate_overlayed_file "etc/sysconfig/iptables" "kura/install/iptables.init"
   cp /etc/sysconfig/iptables ${INSTALL_DIR}/kura/.data/iptables
 
+  populate_overlayed_file "etc/init.d/firewall"
+  populate_overlayed_file "etc/sysconfig/iptables"
+  populate_overlayed_file "etc/network/if-down.d/ifdown-local"
+  cp -n $SNAP/etc/network/if-up.d/ifup-local /etc/network/if-up.d/ifup-local
+  populate_overlayed_file "etc/init.d/bind9"
+  populate_overlayed_file "etc/init.d/hostapd"
 }
 
 fix_file_paths() {

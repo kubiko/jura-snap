@@ -2,7 +2,7 @@
 
 # read snap configuration
 . $SNAP/bin/config
-
+. $SNAP/bin/hooks-common
 
 for key in ${keys}
 do
@@ -20,3 +20,9 @@ do
         export $key=$value
     fi
 done
+
+
+# retry populating files which migth be missed because of not yet connected plugs
+populate_overlayed_file "etc/network/if-down.d/ifdown-local"
+cp -n $SNAP/etc/network/if-up.d/ifup-local /etc/network/if-up.d/ifup-local
+echo "PATH=$PATH"
