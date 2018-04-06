@@ -1,5 +1,10 @@
 #!/bin/bash
 
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$SNAP/lib:$SNAP/usr/lib:$SNAP/lib/$(arch)-linux-gnu:$SNAP/usr/lib/$(arch)-linux-gnu"
+export PATH=$SNAP/jre/bin:$PATH
+export LD_LIBRARY_PATH="$SNAP/lib/$(arch)-linux-gnu:$SNAP/usr/lib/$(arch)-linux-gnu:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH=$SNAP_LIBRARY_PATH:$LD_LIBRARY_PATH
+
 set -x
 
 exec >> $SNAP_COMMON/install-hook.log 2>&1
