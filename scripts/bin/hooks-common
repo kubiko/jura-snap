@@ -14,35 +14,30 @@ populate_writable_data() {
   mkdir -p ${SNAP_COMMON}/.data
   if [ ! -d ${SNAP_COMMON}/conf ]; then
       mkdir -p ${SNAP_COMMON}/conf
-      cp ${SNAP}/kura/kura/kura*.properties ${SNAP_COMMON}/conf
-      cp ${SNAP}/kura/kura/dpa*.properties ${SNAP_COMMON}/conf
-      cp ${SNAP}/kura/kura/log*.properties ${SNAP_COMMON}/conf
+      cp ${SNAP}/kura/kura/*.properties ${SNAP_COMMON}/conf
   fi
 
-  cp ${SNAP}/kura/install/recover_default_config.init ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
-  chmod +x ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
+  if [ ! -e ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh ]; then
+      cp ${SNAP}/kura/install/recover_default_config.init ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
+      chmod +x ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
+  fi
 
+
+  if [ ! -e ${SNAP_COMMON}/etc/monitrc ]; then
+      cp ${SNAP}/kura/install/monitrc.raspbian ${SNAP_COMMON}/etc/monitrc
+      chmod 700 ${SNAP_COMMON}/etc/monitrc
+  fi
 
   mkdir -p ${SNAP_COMMON}/etc/bind
-  cp ${SNAP}/kura/install/monitrc.raspbian ${SNAP_COMMON}/etc/monitrc
-  chmod 700 ${SNAP_COMMON}/etc/monitrc
+  cp --no-clobber ${SNAP}/etc/bind/* ${SNAP_COMMON}/etc/bind
+  sed -i 's#${SNAP_COMMON}#'"$SNAP_COMMON"'#g' ${SNAP_COMMON}/etc/bind/*
+  mkdir -p ${SNAP_COMMON}/var/named
+  mkdir -p ${SNAP_COMMON}/var/log
+  mkdir -p ${SNAP_COMMON}/var/run/named
 
-
-  cp ${SNAP}/etc/bind/* ${SNAP_COMMON}/etc/bind
-  cp ${SNAP}/kura/install/named.conf ${SNAP_COMMON}/etc/bind
-  sed -i 's#/etc/bind/#${SNAP_COMMON}/etc/bind/#g' ${SNAP_COMMON}/etc/bind/*
-  sed -i -e 's#/var/named#${SNAP_COMMON}/named#g' \
-         -e 's#/var/log/named.log#{SNAP_DATA}/log/named.log#g' \
-         -e 's#/etc/named#{SNAP_COMMON}/etc/bind/named#g' \
-         ${SNAP_COMMON}/etc/bind/named.conf
-
-  mkdir -p ${SNAP_COMMON}/named
+  [ ! -e ${SNAP_COMMON}/var/named/named.ca ] && cp ${SNAP}/kura/install/named.ca ${SNAP_COMMON}/var/named/
   touch {SNAP_DATA}/log/named.log
-  cp ${SNAP}/kura/install/named.ca ${SNAP_COMMON}/named/
-  cp ${SNAP}/kura/install/named.rfc1912.zones ${SNAP_COMMON}/etc/bind/named.rfc1912.zones
-  if [ ! -f " ${SNAP_COMMON}/etc/bind/rndc.key" ] ; then
-  	rndc-confgen -r /dev/urandom -a -c ${SNAP_COMMON}/etc/named.iscdlv.key
-  fi
+  [ ! -e "${SNAP_COMMON}/etc/bind/rndc.key" ] && ${SNAP}/usr/sbin/rndc-confgen -r /dev/urandom -a -c ${SNAP_COMMON}/etc/bind/rndc.key
 
 
   mac_addr=$(head -1 /sys/class/net/eth0/address | tr '[:lower:]' '[:upper:]')
@@ -71,6 +66,7 @@ populate_writable_data() {
   cp -n $SNAP/etc/network/if-up.d/ifup-local /etc/network/if-up.d/ifup-local
   populate_overlayed_file "etc/init.d/bind9"
   populate_overlayed_file "etc/init.d/hostapd"
+  populate_overlayed_file "/etc/network/interfaces"
 }
 
 fix_file_paths() {
