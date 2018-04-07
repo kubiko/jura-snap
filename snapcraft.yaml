@@ -1,3 +1,4 @@
+
 name: kura
 version: "3.x"
 version-script: |
@@ -11,6 +12,14 @@ description: |
 confinement: strict
 grade: stable
 
+hooks:
+  install:
+    plugs:
+        - network-setup-control
+  post-refresh:
+    plugs:
+        - network-setup-control
+
 plugs:
   client:
     interface: bluez
@@ -18,6 +27,21 @@ slots:
   service:
     interface: bluez
 
+layout:
+    /etc/sysconfig:
+        bind: $SNAP_COMMON/etc/sysconfig
+    /etc/bind:
+        bind: $SNAP_COMMON/etc/bind
+    /etc/hostapd:
+        bind: $SNAP_COMMON/etc/hostapd
+    /etc/network/if-down.d/ifdown-local:
+        bind-file: $SNAP_COMMON/etc/network/if-down.d/ifdown-local
+    /etc/init.d/hostapd:
+        bind-file:  $SNAP/etc/init.d/hostapd
+    /etc/init.d/firewall:
+        bind-file:  $SNAP/etc/init.d/firewall
+    /etc/adjtime:
+        bind-file: $SNAP_COMMON/etc/adjtime
 apps:
 #    service:
 #        command: kura-control start_kura_backgroud.sh
@@ -29,7 +53,6 @@ apps:
 #            - firewall-control
 #            - network-bind
 #            - network-control
-#            - network-manager
 #            - network-setup-control
 #            - process-control
 #            - removable-media
@@ -38,10 +61,10 @@ apps:
 
     kura:
         command: kura/bin/start_kura.sh
-        plugs: &default-plugs [home , io-ports-control, hardware-observe, firewall-control, network-bind, network-control, network-manager, network-setup-control, process-control, removable-media, system-observe, time-control]
+        plugs: &default-plugs [home , io-ports-control, hardware-observe, firewall-control, network-bind, network-control, network-setup-control, process-control, removable-media, system-observe, time-control, ppp, log-observe, mount-observe]
 
-    kura-init:
-        command: kura-init start
+    kura-daemon:
+        command: kura/bin/start_kura_debug.sh
         stop-command: kura-init stop
         daemon: simple
         plugs: *default-plugs
@@ -67,6 +90,22 @@ apps:
         daemon: simple
         slots:
             - service
+
+    named:
+        command: "usr/sbin/named -f -c $SNAP_COMMON/etc/bind/named.conf"
+        daemon: simple
+        stop-command: usr/sbin/rndc stop
+        plugs: *default-plugs
+
+#    hostapd:
+#        command: "usr/sbin/hostapd --pidfile ${SNAP_DATA}/run/hostapd.pid"
+#        daemon: simple
+#        plugs: *default-plugs
+
+#    wpa-supplicant:
+#        command: "/sbin/wpa_supplicant -u -s -O $SNAP_COMMON/run/wpa_supplicant"
+#        daemon: simple
+#        plugs: *default-plugs
 
 parts:
     kura:
@@ -98,18 +137,81 @@ parts:
         # first tweak source for snap building
         prepare: |
             sed -i \
-                  -e 's#name="target.device" value=".*"#name="target.device" value="ubuntu-snap"#g' \
+                  -e '/int result;/a logger.info("OK:" + OS_VERSION + "raspi-Name:" + KuraConstants.Raspberry_Pi.getImageName() );' \
+                  -e '/int result;/a logger.info("OK: snap: " + System.getProperty("kura.os.snap") );' \
+                  -e '/int result;/a logger.info("OK: snap.data: " + System.getProperty("kura.data.snap.data") );' \
+                  -e '/int result;/a logger.info("OK: snap.common: " + System.getProperty("kura.data.snap.common") );' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dns/LinuxNamed.java
+            sed -i \
+                  -e '/String OS_VERSION/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e 's/\"\/etc\/bind\/named.conf\"/SNAP_COMMON + &/' \
+                  -e 's/\"\/etc\/named.rfc1912.zones\"/SNAP_COMMON + \"\/etc\/bind\/named.rfc1912.zones\"/g' \
+                  -e 's/\"\/var\/log\/named.log\"/SNAP_COMMON + &/' \
+                  -e 's#/usr/sbin/named#named -f#g' \
+                  -e 's#/etc/init.d/bind9 start#snapctl start --enable '"${SNAPCRAFT_PROJECT_NAME}"'.named#g' \
+                  -e 's#/etc/init.d/bind9 stop#snapctl stop --disable '"${SNAPCRAFT_PROJECT_NAME}"'.named#g' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dns/LinuxNamed.java
+            sed -i \
+                  -e '/String OS_VERSION/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e '/String OS_VERSION/a \    private static final String SNAP = System.getProperty("kura.os.snap");' \
+                  -e 's#\"hostapd\"#SNAP + \"\/usr\/sbin\/\" + \"hostapd\"#g' \
+                  -e 's#systemctl start hostapd#snapctl start --enable '"${SNAPCRAFT_PROJECT_NAME}"'.hostapd#g' \
+                  -e 's#systemctl stop hostapd#snapctl stop --disable '"${SNAPCRAFT_PROJECT_NAME}"'.hostapd#g' \
+                  -e 's#\"/etc/hostapd#SNAP_COMMON + \"/etc/hostapd/hostapd-#g' \
+               kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/wifi/HostapdManager.java
+            sed -i \
+                  -e '/String OS_VERSION/a \    private static final String SNAP = System.getProperty("kura.os.snap");' \
+                  -e 's/\"ifup/SNAP + \"\/sbin\/\" + &/' \
+                  -e 's/\"ifdown/SNAP + \"\/sbin\/\" + &/' \
+                  -e 's/\"iw/SNAP + \"\/sbin\/\" + &/' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/util/LinuxNetworkUtil.java
+            sed -i \
+                  -e 's#systemctl start wpa_supplicant#snapctl start --enable '"${SNAPCRAFT_PROJECT_NAME}"'.wpa-supplicant#g' \
+                  -e 's#systemctl stop hostapd#snapctl stop --disable '"${SNAPCRAFT_PROJECT_NAME}"'.hostapd#g' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/wifi/WpaSupplicantManager.java
+            sed -i \
+                  -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e 's/\"\/etc\/network\/interfaces\"/SNAP_COMMON + &/' \
+                  -e 's#/etc/network/interfaces.tmp#/tmp/network_interfaces.tmp#g' \
+                kura/org.eclipse.kura.net.admin/src/main/java/org/eclipse/kura/net/admin/visitor/linux/IfcfgConfigWriter.java
+            sed -i \
+                  -e 's#name="target.device" value=".*"#name="target.device" value="ubuntu-core"#g' \
                   -e 's#name="native.tag" value=".*"#name="native.tag" value="x86_64"#g' \
-                  -e 's#name="kura.os.version" value=".*"#name="kura.os.version" value="ubuntu"#g' \
+                  -e 's#name="kura.os.version" value=".*"#name="kura.os.version" value="ubuntu-core"#g' \
                   -e 's#name="kura.arch" value=".*"#name="kura.arch" value="x86_64"#g' \
                   -e 's#name="kura.install.dir" value=".*"#name="kura.install.dir" value="/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current"#g' \
                 kura/distrib/pom.xml
+            sed -i \
+                  -e 's#raspbian#ubuntu-core#g' \
+                  -e 's#raspberry-pi#ubuntu-core#g' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/util/KuraConstants.java
+            sed -i \
+                  -e 's#/etc/dhcpd-#/etc/hostapd/dhcpd-#g' \
+                  -e 's#/etc/hostapd.conf#/etc/hostapd/hostapd.conf#g' \
+                kura/org.eclipse.kura.net.admin/src/main/java/org/eclipse/kura/net/admin/NetworkAdminServiceImpl.java
+            sed -i \
+                  -e 's#/etc/hostapd-#/etc/hostapd/hostapd-#g' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/wifi/HostapdManager.java
+            sed -i \
+                  -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e '/Logger logger/a \    private static final String SNAP_DATA = System.getProperty("kura.data.snap.data");' \
+                  -e 's/\"\/var\/run\"/SNAP_DATA + \"\/run\"/g' \
+                  -e 's/\"\/var\/lib\/dhclient\"/SNAP_DATA + &/' \
+                  -e 's/dhcpClientTool = DhcpClientTool.NONE/dhcpClientTool = DhcpClientTool.DHCLIENT/g' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dhcp/DhcpClientLeases.java \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dhcp/DhcpClientManager.java
+            sed -i \
+                  -e 's#DHCLIENT("dhclient")#DHCLIENT(\"\/snap\/kura\/current\/sbin\/dhclient\")#g' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dhcp/DhcpClientTool.java
+            sed -i \
+                  -e 's#systemctl start bluetooth#snapctl start --enable '"${SNAPCRAFT_PROJECT_NAME}"'.bluez #g' \
+                kura/org.eclipse.kura.ble.provider/src/main/java/org/eclipse/kura/internal/ble/BluetoothLeServiceImpl.java
             sed -i \
                   -e 's#osgi.instance.area=.*#osgi.instance.area=/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/data#g' \
                   -e 's#org.osgi.framework.storage=.*#org.osgi.framework.storage=/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/data#g' \
                 kura/distrib/src/main/osgi/equinox_3.11.1/configuration/config.ini
             sed -i \
-                  -e 's#Raspberry-Pi#snappy#g' \
+                  -e 's#Raspberry-Pi#ubuntu-core#g' \
                   -e 's#kura.tmp=.*#kura.tmp=/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/tmp#g' \
                 kura/distrib/src/main/resources/raspberry-pi-2*/kura.properties
             sed -i \
@@ -151,12 +253,15 @@ parts:
             sed -i -e 's#-consoleLog >> /var/log/kura-.*#-consoleLog#g' \
                    -e 's#/tmp/.kura#${SNAP_DATA}/tmp#g' \
                    -e 's#${DIR}/data#${SNAP_COMMON}/data#g' \
+                   -e '/-Dkura.data.dir=/a \        -Dkura.data.snap.common=${SNAP_COMMON}\/ \\' \
+                   -e '/-Dkura.data.dir=/a \        -Dkura.data.snap.data=${SNAP_DATA}\/ \\' \
+                   -e '/-Dkura.data.dir=/a \        -Dkura.os.snap=${SNAP}\/ \\' \
                    -e 's#/var/log#${SNAP_DATA}/log#g' \
                    -e 's#-Dkura.configuration\=.*#-Dkura.configuration=file:${SNAP_COMMON}/conf/kura.properties \\#g' \
                    -e 's#-Dkura.custom.configuration\=.*#-Dkura.custom.configuration=file:${SNAP_COMMON}/conf/kura_custom.properties \\#g' \
                    -e 's#-Ddpa.configuration\=.*#-Ddpa.configuration=${SNAP_COMMON}/conf/dpa.properties \\#g' \
                    -e 's#-Dlog4j.configuration\=.*#-Dlog4j.configuration=file:${SNAP_COMMON}/conf/log4j.properties \\#g' \
-                   -e 's#-Dkura.os.version\=.*#-Dkura.os.version=ubuntucore \\#g' \
+                   -e 's#-Dkura.os.version\=.*#-Dkura.os.version=ubuntu-core \\#g' \
                    -e 's#-Dtarget.device\=.*#-Dtarget.device=core \\#g' \
                    -e 's#/var/run/kura.pid#/$SNAP_DATA/run/kura.pid#g' \
                    -e 's#-Xms[0-9]*m#-Xms${JAVA_MEMORY}m#g' \
@@ -166,14 +271,26 @@ parts:
                   '1;/\/kura\/config.ini/{ print ". $SNAP/bin/read-config"}' $SNAPCRAFT_PART_INSTALL/kura/bin/start_kura*.sh
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/install/*.raspbian
             chmod +x $SNAPCRAFT_PART_INSTALL/kura/install/*.init
+            sed -i \
+                 -e '/directory.*/a \        bindkeys-file "${SNAP_COMMON}/etc/bind/bind.keys";' \
+                 -e '/directory.*/a \        session-keyfile "${SNAP_COMMON}/var/run/named/session.key";' \
+                 -e '/directory.*/a \        pid-file "${SNAP_COMMON}/var/run/named/named.pid";' \
+                 -e 's#/var/named#${SNAP_COMMON}/var/named#g' \
+                 -e 's#/var/log/named.log#${SNAP_COMMON}/var/log/named.log#g' \
+                 -e 's#/etc/named.rfc1912.zones#${SNAP_COMMON}/etc/bind/named.rfc1912.zones#g' \
+                 -e 's#named.ca#${SNAP_COMMON}/var/named/named.ca#g' \
+                 $SNAPCRAFT_PART_INSTALL/kura/install/named.conf
         organize:
-            kura/install/kura.init.raspbian: bin/kura-init
-            kura/install/monit.init.raspbian: bin/monit-init
-            kura/install/firewall.init: bin/firewall-init
-            kura/install/iptables.init: etc/sysconfig/iptables
-            kura/install/ifup-local.debian: etc/network/if-up.d/ifup-local
-            kura/install/ifdown-local: etc/network/if-down.d/ifdown-local
+            kura/install/kura.init.raspbian:          bin/kura-init
+            kura/install/monit.init.raspbian:         bin/monit-init
+            kura/install/firewall.init:               etc/init.d/firewall
+            kura/install/iptables.init:               etc/sysconfig/iptables
+            kura/install/ifup-local.debian:           etc/network/if-up.d/ifup-local
+            kura/install/ifdown-local:                etc/network/if-down.d/ifdown-local
             kura/install/network.interfaces.raspbian: etc/network/interfaces
+            kura/install/named.conf:                  etc/bind/named.conf
+            kura/install/named.rfc1912.zones:         etc/bind/named.rfc1912.zones
+            
 
     # start-stop-daemon
     start-stop-daemon:
@@ -190,20 +307,39 @@ parts:
         plugin: nil
         stage-packages:
             - bind9
+            - bind9-host
+            - iptables
             - hostapd
             - isc-dhcp-server
+            - isc-dhcp-client
             - iw
             - ethtool
             - wireless-tools
+            - wpasupplicant
+            - ifupdown
+        stage:
+            - -etc/bind/named.conf
+            - -etc/bind/zones.rfc1918
         install: |
             # fix bind9 and dependencies
             sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
-                   -e 's#/run/named/#{SNAP_DATA}/named#g' \
-                   -e 's#/run/named#{SNAP_DATA}/run/named#g' \
+                   -e 's#/run/named#${SNAP_DATA}/run/named#g' \
+                   -e 's#/run/hostapd#${SNAP_DATA}/run/hostapd#g' \
+                   -e 's#/run/openvpn#${SNAP_DATA}/run/openvpn#g' \
+                   -e 's#/var/run/#${SNAP_DATA}/var/run/#g' \
+                   -e 's#/etc/default#${SNAP_DATA}/etc/default#g' \
                    -e 's|chown.*|# chown: not allowed from snap|g' \
-                   $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
+                   $SNAPCRAFT_PART_INSTALL/etc/init.d/*
+            sed -i -e 's#/sbin/if#${SNAP}/sbin/if#g' \
+                   $SNAPCRAFT_PART_INSTALL/etc/wpa_supplicant/functions.sh
             awk -i inplace '1;/RESOLVCONF=no/{ print "echo \"SNAP=${SNAP}\""}' \
                    $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
+            sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
+                   -e 's#/run/hostapd#${SNAP_DATA}/run/hostapd#g' \
+                   -e 's#/run/sendsigs#${SNAP_DATA}/run/sendsigs#g' \
+                   $SNAPCRAFT_PART_INSTALL/etc/hostapd/*
+            find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i 's#=/sbin/#=${SNAP}/sbin/#g' {} \;
+            find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i 's#/usr/sbin/#${SNAP}/usr/sbin/#g' {} \;
 
     # java run time
     jre:
@@ -217,6 +353,7 @@ parts:
     helpers:
         plugin: dump
         source: scripts
+
     bluez:
         plugin: autotools
         source: https://git.launchpad.net/~snappy-hwe-team/snappy-hwe-snaps/+git/bluez
