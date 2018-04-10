@@ -9,9 +9,12 @@ populate_overlayed_file() {
 populate_writable_data() {
   mkdir -p ${SNAP_DATA}/log
   mkdir -p ${SNAP_DATA}/run
+  mkdir -p ${SNAP_DATA}/var/lib/dhclient
   mkdir -p ${SNAP_COMMON}/console
   mkdir -p ${SNAP_COMMON}/packages
   mkdir -p ${SNAP_COMMON}/.data
+  mkdir -p ${SNAP_COMMON}/sbin
+
   if [ ! -d ${SNAP_COMMON}/conf ]; then
       mkdir -p ${SNAP_COMMON}/conf
       cp ${SNAP}/kura/kura/*.properties ${SNAP_COMMON}/conf
@@ -44,10 +47,16 @@ populate_writable_data() {
   sed "s/^ssid=kura_gateway.*/ssid=kura_gateway_${mac_addr}/" < ${SNAP}/kura/install/hostapd.conf > ${SNAP_COMMON}/etc/hostapd/hostapd-wlan0.conf
   cp ${SNAP_COMMON}/etc/hostapd-wlan0.conf ${SNAP_COMMON}/.data/hostapd-wlan0.conf
 
-  cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/etc/hostapd/dhcpd-eth0.conf
+  if [ ! -e ${SNAP_COMMON}/etc/dhcp ]; then
+      cp -r ${SNAP}/etc/dhcp ${SNAP_COMMON}/etc/
+      mkdir -p ${SNAP_COMMON}/etc/dhcp/dhclient-enter-hooks.d
+      mkdir -p ${SNAP_COMMON}/etc/dhcp/dhclient-exit-hooks.d
+  fi
+
+  cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/etc/dhcpd-eth0.conf
   cp ${SNAP}/kura/install/dhcpd-eth0.conf ${SNAP_COMMON}/.data/dhcpd-eth0.conf
 
-  cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/etc/hostapd/dhcpd-wlan0.conf
+  cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/etc/dhcpd-wlan0.conf
   cp ${SNAP}/kura/install/dhcpd-wlan0.conf ${SNAP_COMMON}/.data/dhcpd-wlan0.conf
 
   if [ ! -d ${SNAP_COMMON}/data ]; then
@@ -62,11 +71,25 @@ populate_writable_data() {
 
   populate_overlayed_file "etc/init.d/firewall"
   populate_overlayed_file "etc/sysconfig/iptables"
-  populate_overlayed_file "etc/network/if-down.d/ifdown-local"
-  cp -n $SNAP/etc/network/if-up.d/ifup-local /etc/network/if-up.d/ifup-local
-  populate_overlayed_file "etc/init.d/bind9"
-  populate_overlayed_file "etc/init.d/hostapd"
-  populate_overlayed_file "/etc/network/interfaces"
+  if [ ! "$(ls ${SNAP_COMMON}/etc/network)" ]; then
+      cp -r ${SNAP}/etc/network/* ${SNAP_COMMON}/etc/network/
+  fi
+  if [ ! "$(ls ${SNAP_COMMON}/etc/wpa_supplicant)" ]; then
+      cp -r ${SNAP}/etc/wpa_supplicant ${SNAP_COMMON}/etc/
+  fi
+  if [ ! "$(ls ${SNAP_COMMON}/etc/hostapd)" ]; then
+      cp -r ${SNAP}/etc/hostapd ${SNAP_COMMON}/etc/
+  fi
+
+  # setup dhclient-scripts
+  cp $SNAP/sbin/dhclient-script $SNAP_COMMON/sbin
+  sed -i \
+        -e '/export BASH_XTRACEFD=/a export PATH="'"$PATH"'' \
+        -e '/export BASH_XTRACEFD=/a export LD_LIBRARY_PATH='"$LD_LIBRARY_PATH"'' \
+        -e '/export BASH_XTRACEFD=/a export SNAP='"$SNAP"'' \
+        -e '/export BASH_XTRACEFD=/a export SNAP_DATA='"$SNAP_DATA"'' \
+        -e '/export BASH_XTRACEFD=/a export SNAP_COMMON='"$SNAP_COMMON"'' \
+     $SNAP_COMMON/sbin/dhclient-script
 }
 
 fix_file_paths() {
