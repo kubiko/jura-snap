@@ -9,11 +9,30 @@ populate_overlayed_file() {
 populate_writable_data() {
   mkdir -p ${SNAP_DATA}/log
   mkdir -p ${SNAP_DATA}/run
+  mkdir -p ${SNAP_DATA}/var/run
   mkdir -p ${SNAP_DATA}/var/lib/dhclient
+  mkdir -p ${SNAP_DATA}/var/lib/dhcp
   mkdir -p ${SNAP_COMMON}/console
   mkdir -p ${SNAP_COMMON}/packages
   mkdir -p ${SNAP_COMMON}/.data
   mkdir -p ${SNAP_COMMON}/sbin
+  mkdir -p ${SNAP_COMMON}/var/named
+  mkdir -p ${SNAP_COMMON}/var/log
+  mkdir -p ${SNAP_COMMON}/var/run/named
+  mkdir -p ${SNAP_COMMON}/etc/bind
+
+  if [ ! "$(ls ${SNAP_COMMON}/etc/hostapd)" ]; then
+      cp -r ${SNAP}/etc/hostapd ${SNAP_COMMON}/etc/
+  fi
+
+  if [ ! "$(ls ${SNAP_COMMON}/etc/network)" ]; then
+      cp -r ${SNAP}/etc/network ${SNAP_COMMON}/etc/
+      sed -i 's#${SNAP_COMMON}#'"$SNAP_COMMON"'#g' ${SNAP_COMMON}/etc/network/if-up.d/ifup-local
+  fi
+
+  if [ ! "$(ls ${SNAP_COMMON}/etc/wpa_supplicant)" ]; then
+      cp -r ${SNAP}/etc/wpa_supplicant ${SNAP_COMMON}/etc/
+  fi
 
   if [ ! -d ${SNAP_COMMON}/conf ]; then
       mkdir -p ${SNAP_COMMON}/conf
@@ -25,18 +44,13 @@ populate_writable_data() {
       chmod +x ${SNAP_COMMON}/.data/.recoverDefaultConfig.sh
   fi
 
-
   if [ ! -e ${SNAP_COMMON}/etc/monitrc ]; then
       cp ${SNAP}/kura/install/monitrc.raspbian ${SNAP_COMMON}/etc/monitrc
       chmod 700 ${SNAP_COMMON}/etc/monitrc
   fi
 
-  mkdir -p ${SNAP_COMMON}/etc/bind
   cp --no-clobber ${SNAP}/etc/bind/* ${SNAP_COMMON}/etc/bind
   sed -i 's#${SNAP_COMMON}#'"$SNAP_COMMON"'#g' ${SNAP_COMMON}/etc/bind/*
-  mkdir -p ${SNAP_COMMON}/var/named
-  mkdir -p ${SNAP_COMMON}/var/log
-  mkdir -p ${SNAP_COMMON}/var/run/named
 
   [ ! -e ${SNAP_COMMON}/var/named/named.ca ] && cp ${SNAP}/kura/install/named.ca ${SNAP_COMMON}/var/named/
   touch {SNAP_DATA}/log/named.log
@@ -71,20 +85,11 @@ populate_writable_data() {
 
   populate_overlayed_file "etc/init.d/firewall"
   populate_overlayed_file "etc/sysconfig/iptables"
-  if [ ! "$(ls ${SNAP_COMMON}/etc/network)" ]; then
-      cp -r ${SNAP}/etc/network/* ${SNAP_COMMON}/etc/network/
-  fi
-  if [ ! "$(ls ${SNAP_COMMON}/etc/wpa_supplicant)" ]; then
-      cp -r ${SNAP}/etc/wpa_supplicant ${SNAP_COMMON}/etc/
-  fi
-  if [ ! "$(ls ${SNAP_COMMON}/etc/hostapd)" ]; then
-      cp -r ${SNAP}/etc/hostapd ${SNAP_COMMON}/etc/
-  fi
 
   # setup dhclient-scripts
-  cp $SNAP/sbin/dhclient-script $SNAP_COMMON/sbin
+  cp ${SNAP}/sbin/dhclient-script ${SNAP_COMMON}/sbin
   sed -i \
-        -e '/export BASH_XTRACEFD=/a export PATH="'"$PATH"'' \
+        -e '/export BASH_XTRACEFD=/a export PATH=\"'"$PATH"'\"' \
         -e '/export BASH_XTRACEFD=/a export LD_LIBRARY_PATH='"$LD_LIBRARY_PATH"'' \
         -e '/export BASH_XTRACEFD=/a export SNAP='"$SNAP"'' \
         -e '/export BASH_XTRACEFD=/a export SNAP_DATA='"$SNAP_DATA"'' \
@@ -102,10 +107,7 @@ fix_file_paths() {
          -e 's#kura.plugins=/.*#kura.plugins='"${SNAP}"'/kura/kura/plugins#g' \
          -e 's#kura.packages=/.*#kura.packages='"${SNAP_COMMON}"'/packages#g' \
          -e 's#kura.data=/.*#kura.data='"${SNAP_COMMON}"'/data#g' \
-         -e 's#kura.tmp=/.*#kura.tmp='"${SNAP_DATA}"'/tmp#g' \
          -e 's#kura.snapshots=/.*#kura.snapshots='"${SNAP_COMMON}"'/data/snapshots#g' \
          -e 's#kura.style.dir=/.*#kura.style.dir='"${SNAP_COMMON}"'/console/skin#g' \
          ${SNAP_COMMON}/conf/kura.properties
 }
-
-

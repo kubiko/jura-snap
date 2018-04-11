@@ -73,6 +73,9 @@ apps:
     kura-debug:
         command: kura/bin/start_kura_debug.sh
         plugs: *default-plugs
+    bash:
+        command: bin/bash
+        plugs: *default-plugs
 
     help:
         command: bin/help
@@ -150,8 +153,10 @@ parts:
             sed -i \
                   -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
                   -e 's/\"\/etc\/network\/interfaces\"/SNAP_COMMON + &/' \
+                  -e 's/\"\/etc\/network\/\"/SNAP_COMMON + &/' \
                   -e 's#/etc/network/interfaces.tmp#/tmp/network_interfaces.tmp#g' \
                 kura/org.eclipse.kura.net.admin/src/main/java/org/eclipse/kura/net/admin/visitor/linux/IfcfgConfigWriter.java \
+                kura/org.eclipse.kura.net.admin/src/main/java/org/eclipse/kura/net/admin/visitor/linux/IfcfgConfigReader.java \
                 kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/util/LinuxNetworkUtil.java \
                 kura/org.eclipse.kura.net.admin/src/main/java/org/eclipse/kura/net/admin/NetworkAdminServiceImpl.java
             sed -i \
@@ -176,8 +181,10 @@ parts:
                   -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
                   -e '/Logger logger/a \    private static final String SNAP_DATA = System.getProperty("kura.data.snap.data");' \
                   -e '/Logger logger/a \    private static final String SNAP = System.getProperty("kura.os.snap");' \
-                  -e 's/\"\/var\/run\"/SNAP_DATA + \"\/run\"/g' \
+                  -e 's/\"\/var\/run\"/SNAP_DATA + \"\/var\/run\"/g' \
+                  -e 's/\"\/var\/run\/\"/SNAP_DATA + \"\/var\/run\/\"/g' \
                   -e 's/\"\/var\/lib\/dhclient\"/SNAP_DATA + &/' \
+                  -e 's/\"\/var\/lib\/dhcp\"/SNAP_DATA + &/' \
                   -e 's/\"\/etc\/\"/SNAP_COMMON + &/g' \
                   -e '/if (useLeasesFile)/i \             sb.append(\"-sf \" + SNAP_COMMON + "\/sbin\/dhclient-script \");' \
                   -e '/if (useLeasesFile)/i \             sb.append(\"-cf \" + SNAP_COMMON + \"\/etc\/dhcp\/dhclient.conf \");' \
@@ -190,15 +197,43 @@ parts:
                 kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dhcp/DhcpServerImpl.java \
                 kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dhcp/DhcpServerManager.java
             sed -i \
+                  -e '/Logger logger/a \    private static final String SNAP_DATA = System.getProperty("kura.data.snap.data");' \
+                  -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e 's/\"\/etc\/resolv.conf/SNAP_COMMON + &/' \
+                  -e 's/\"\/var\/run\/ppp\/resolv.conf\"/SNAP_DATA + &/' \
+                  -e 's/\"\/etc\/ppp\/resolv.conf\"/SNAP_COMMON + &/' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dns/LinuxDns.java
+            sed -i \
+                  -e '/Logger logger/a \    private static final String SNAP_DATA = System.getProperty("kura.data.snap.data");' \
+                  -e 's/\"\/var\/lock\/LCK/SNAP_DATA + &/' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/ppp/PppLinux.java \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/modem/SerialModemDriver.java
+            sed -i \
+                  -e '/Logger logger/a \    private static final String SNAP = System.getProperty("kura.os.snap");' \
+                  -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e 's/\"\/etc\/init.d\/firewall_cust/SNAP + &/' \
+                  -e 's/\"\/etc\/sysconfig/SNAP_COMMON + &/' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/iptables/IptablesConfig.java \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/iptables/LinuxFirewall.java
+            sed -i \
+                  -e '/Logger logger/a \    private static final String SNAP_COMMON = System.getProperty("kura.data.snap.common");' \
+                  -e 's/\"\/etc\/wpa_supplicant/SNAP_COMMON + &/' \
+                kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/wifi/WpaSupplicantManager.java
+            sed -i \
                   -e 's#systemctl start bluetooth#snapctl start --enable '"${SNAPCRAFT_PROJECT_NAME}"'.bluez #g' \
                 kura/org.eclipse.kura.ble.provider/src/main/java/org/eclipse/kura/internal/ble/BluetoothLeServiceImpl.java
+            sed -i \
+                  -e '/for (IPAddress router : routers) {/i \           if (routers != null && !routers.isEmpty()) {' \
+                  -e '/for (IPAddress dnsServer : dnsServers) {/i \           if (dnsServers != null && !dnsServers.isEmpty()) {' \
+                  -e '/servers.add(dnsServer);/a \          }' \
+                  -e '/gateways.add(router);/a \           }' \
+               kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dhcp/DhcpClientLeases.java
             sed -i \
                   -e 's#osgi.instance.area=.*#osgi.instance.area=/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/data#g' \
                   -e 's#org.osgi.framework.storage=.*#org.osgi.framework.storage=/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/data#g' \
                 kura/distrib/src/main/osgi/equinox_3.11.1/configuration/config.ini
             sed -i \
                   -e 's#Raspberry-Pi#ubuntu-core#g' \
-                  -e 's#kura.tmp=.*#kura.tmp=/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/tmp#g' \
                 kura/distrib/src/main/resources/raspberry-pi-2*/kura.properties
             sed -i \
                   -e 's#/var/log/kura#/var/snap/'"${SNAPCRAFT_PROJECT_NAME}"'/current/log/kura#g' \
@@ -208,7 +243,7 @@ parts:
                   -e 's#/etc/init.d/firewall_cust#${SNAP_COMMON}/etc/init.d/firewall_cust#g' \
                 kura/distrib/src/main/resources/raspberry-pi-2*/firewall.init
             sed -i \
-                  -e 's#/var/run/#${SNAP_DATA}/run/#g' \
+                  -e 's#/var/run/#${SNAP_DATA}/var/run/#g' \
                 kura/distrib/src/main/resources/common/*.init.raspbian
             awk -i inplace \
                   '1;/export PATH/{ print \
@@ -223,8 +258,7 @@ parts:
                   -e 's#/etc/monitrc#${SNAP_COMMON}/etc/monitrc#g' \
                 kura/distrib/src/main/resources/common/monit.init.raspbian
             sed -i \
-                  -e 's#/etc/network/interfaces#${SNAP}/etc/network/interfaces#g' \
-                  -e 's#/tmp/.kura#${SNAP_DATA}/tmp#g' \
+                  -e 's#/etc/network/interfaces#${SNAP_COMMON}/etc/network/interfaces#g' \
                 kura/distrib/src/main/resources/common/i*
 
         build: |
@@ -237,7 +271,6 @@ parts:
             mv $SNAPCRAFT_PART_INSTALL/kura_* $SNAPCRAFT_PART_INSTALL/kura
             # tweak some config settings
             sed -i -e 's#-consoleLog >> /var/log/kura-.*#-consoleLog#g' \
-                   -e 's#/tmp/.kura#${SNAP_DATA}/tmp#g' \
                    -e 's#${DIR}/data#${SNAP_COMMON}/data#g' \
                    -e '/-Dkura.data.dir=/a \        -Dkura.data.snap.common=${SNAP_COMMON}\/ \\' \
                    -e '/-Dkura.data.dir=/a \        -Dkura.data.snap.data=${SNAP_DATA}\/ \\' \
@@ -249,7 +282,7 @@ parts:
                    -e 's#-Dlog4j.configuration\=.*#-Dlog4j.configuration=file:${SNAP_COMMON}/conf/log4j.properties \\#g' \
                    -e 's#-Dkura.os.version\=.*#-Dkura.os.version=ubuntu-core \\#g' \
                    -e 's#-Dtarget.device\=.*#-Dtarget.device=core \\#g' \
-                   -e 's#/var/run/kura.pid#/$SNAP_DATA/run/kura.pid#g' \
+                   -e 's#/var/run/kura.pid#/$SNAP_DATA/var/run/kura.pid#g' \
                    -e 's#-Xms[0-9]*m#-Xms${JAVA_MEMORY}m#g' \
                    -e 's#-Xmx[0-9]*m#-Xmx${JAVA_MEMORY}m#g' \
                    -e '/kura\/config.ini/a . $SNAP\/bin/read-config' \
@@ -272,7 +305,7 @@ parts:
             kura/install/monit.init.raspbian:         bin/monit-init
             kura/install/firewall.init:               etc/init.d/firewall
             kura/install/iptables.init:               etc/sysconfig/iptables
-            kura/install/ifup-local.debian:           etc/network/if-up.d/ifup-local
+            kura/install/ifup-local.raspbian:         etc/network/if-up.d/ifup-local
             kura/install/ifdown-local:                etc/network/if-down.d/ifdown-local
             kura/install/network.interfaces.raspbian: etc/network/interfaces
             kura/install/named.conf:                  etc/bind/named.conf
@@ -325,6 +358,8 @@ parts:
         stage:
             - -etc/bind/named.conf
             - -etc/bind/zones.rfc1918
+            - -etc/network/if-down.d/upstart
+            - -etc/network/if-up.d/upstart
         install: |
             # fix bind9 and dependencies
             sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
