@@ -330,6 +330,15 @@ parts:
             - usbutils
             - nano
             - bash
+            - libx11-6
+            - libxau6
+            - libxdmcp6
+            - libxext6
+            - libxi6
+            - libxrender1
+            - libxtst6
+            - libxcb1
+            - libatm1
 
     # start-stop-daemon
     start-stop-daemon:
