@@ -1,0 +1,396 @@
+diff --git a/execute.c b/execute.c
+index 921a098..e5c9d21 100644
+--- a/execute.c
++++ b/execute.c
+@@ -13,6 +13,9 @@
+ 
+ extern char **environ;
+ static char **localenv = NULL;
++static char *snap = NULL;
++static char *snapCommon = NULL;
++static char *snapData = NULL;
+ 
+ static int check(const char *str) {
+ 	return str != NULL;
+@@ -101,6 +104,15 @@ static void set_environ(interface_defn *iface, char *mode, char *phase) {
+ 		*ppch++ = setlocalenv_nomangle("IFUPDOWN_%s=%s", piface, "parent-lock");
+ 	}
+ 
++	if ( ! snap )
++	  snap = getenv("SNAP");
++
++  if ( ! snapCommon )
++		  snapCommon = getenv("SNAP_COMMON");
++
++	if ( ! snapData )
++			snapData = getenv("SNAP_DATA");
++
+ 	*ppch++ = setlocalenv_nomangle("IFUPDOWN_%s=%s", iface->real_iface, phase);
+ 	*ppch++ = setlocalenv("%s=%s", "IFACE", iface->real_iface);
+ 	*ppch++ = setlocalenv("%s=%s", "LOGICAL", iface->logical_iface);
+@@ -109,7 +121,19 @@ static void set_environ(interface_defn *iface, char *mode, char *phase) {
+ 	*ppch++ = setlocalenv("%s=%s", "MODE", mode);
+ 	*ppch++ = setlocalenv("%s=%s", "PHASE", phase);
+ 	*ppch++ = setlocalenv("%s=%s", "VERBOSITY", verbose ? "1" : "0");
+-	*ppch++ = setlocalenv("%s=%s", "PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
++	if (snap) {
++		char buf[256];
++	  snprintf(buf, sizeof buf, "%s/usr/sbin:%s/usr/bin:%s/sbin:%s/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", snap, snap, snap, snap);
++	  *ppch++ = setlocalenv("%s=%s:", "PATH", buf);
++  } else {
++	  *ppch++ = setlocalenv("%s=%s", "PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
++  }
++	if (snap)
++	  *ppch++ = setlocalenv("%s=%s", "SNAP", snap);
++	if (snapCommon)
++	  *ppch++ = setlocalenv("%s=%s", "SNAP_COMMON", snapCommon);
++	if (snapData)
++	  *ppch++ = setlocalenv("%s=%s", "SNAP_DATA", snapData);
+ 	*ppch = NULL;
+ }
+ 
+@@ -174,9 +198,15 @@ static int execute_scripts(interface_defn *ifd, execfn *exec, char *opt) {
+ 		return 1;
+ 
+ 	char buf[100];
++	if (!snapCommon)
++    snapCommon = getenv("SNAP_COMMON");
+ 
+-	snprintf(buf, sizeof(buf), "/bin/run-parts %s%s/etc/network/if-%s.d", ignore_failures ? "" : "--exit-on-error ", verbose ? "--verbose " : "", opt);
++	if (snapCommon)
++		snprintf(buf, sizeof(buf), "/bin/run-parts %s%s%s/etc/network/if-%s.d", ignore_failures ? "" : "--exit-on-error ", verbose ? "--verbose " : "", snapCommon, opt);
++	else
++	  snprintf(buf, sizeof(buf), "/bin/run-parts %s%s/etc/network/if-%s.d", ignore_failures ? "" : "--exit-on-error ", verbose ? "--verbose " : "", opt);
+ 
++  fprintf(stderr, "OK: exec scripts:%s\n", buf);
+ 	int result = (*exec) (buf);
+ 
+ 	return ignore_failures ? 1 : result;
+@@ -327,6 +357,18 @@ static char *parse(const char *command, interface_defn *ifd) {
+ 	int okay[MAX_OPT_DEPTH] = { 1 };
+ 	int opt_depth = 1;
+ 
++  if ( ! snap )
++	  snap = getenv("SNAP");
++
++  if ( ! snapCommon )
++		  snapCommon = getenv("SNAP_COMMON");
++
++	if ( ! snapData )
++			snapData = getenv("SNAP_DATA");
++
++  if (snap && *command == '/' )
++	  addstr(&result, &len, &pos, snap, strlen(snap));
++
+ 	while (*command) {
+ 		switch (*command) {
+ 		default:
+@@ -350,6 +392,9 @@ static char *parse(const char *command, interface_defn *ifd) {
+ 				okay[opt_depth] = 1;
+ 				opt_depth++;
+ 				command += 2;
++				if (snap && *command == '/' ){
++					addstr(&result, &len, &pos, snap, strlen(snap));
++				}
+ 			} else {
+ 				addstr(&result, &len, &pos, "[", 1);
+ 				command++;
+@@ -395,7 +440,6 @@ static char *parse(const char *command, interface_defn *ifd) {
+ 				}
+ 
+ 				varvalue = get_var(command, namelen, ifd);
+-
+ 				if (varvalue) {
+ 					for (char *position = varvalue; *position; position++)
+ 						if (*position == pat)
+@@ -435,11 +479,10 @@ static char *parse(const char *command, interface_defn *ifd) {
+ int execute(const char *command, interface_defn *ifd, execfn *exec) {
+ 	char *out;
+ 	int ret;
+-
+-	out = parse(command, ifd);
++  out = parse(command, ifd);
+ 	if (!out)
+ 		return 0;
+-
++  fprintf(stderr, "OK: executing:[%s]\n", out);
+ 	ret = (*exec) (out);
+ 	free(out);
+ 
+@@ -459,6 +502,15 @@ char *get_var(const char *id, size_t idlen, interface_defn *ifd) {
+ 	if (strncmpz(id, "iface", idlen) == 0)
+ 		return strdup(ifd->real_iface);
+ 
++	if (strncmpz(id, "snap", idlen) == 0 && snap)
++	  return snap ? strdup(snap) : NULL;
++
++	if (strncmpz(id, "snap-common", idlen) == 0)
++    return snapCommon ? strdup(snapCommon) : NULL;
++
++	if (strncmpz(id, "snap-data", idlen) == 0)
++	  return snapData? strdup(snapData) : NULL;
++
+ 	for (int i = 0; i < ifd->n_options; i++) {
+ 		if (strncmpz(id, ifd->option[i].name, idlen) == 0) {
+ 			if (!ifd->option[i].value)
+diff --git a/inet.defn b/inet.defn
+index 26a09e4..d3540d5 100644
+--- a/inet.defn
++++ b/inet.defn
+@@ -15,7 +15,7 @@ method static
+   description
+     This method may be used to define Ethernet interfaces with statically
+     allocated IPv4 addresses.
+-      
++
+   options
+     address address             -- Address (dotted quad/netmask) *required*
+     netmask mask                -- Netmask (dotted quad or CIDR)
+@@ -94,7 +94,7 @@ method dhcp
+ 
+   up
+     [[/bin/ip link set dev %iface% address %hwaddress%]]
+-    /sbin/dhclient -1 -v -pf /run/dhclient.%iface%.pid -lf /var/lib/dhcp/dhclient.%iface%.leases -I -df /var/lib/dhcp/dhclient6.%iface%.leases %iface% \
++    /sbin/dhclient -1 -v -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases %iface% \
+ 	[[-e IF_METRIC=%metric%]] \
+         if (execable("/sbin/dhclient"))
+     /sbin/pump -i %iface% [[-h %hostname%]] [[-l %leasehours%]] \
+@@ -108,7 +108,7 @@ method dhcp
+         elsif (1)
+ 
+   down
+-    /sbin/dhclient -v -r -pf /run/dhclient.%iface%.pid -lf /var/lib/dhcp/dhclient.%iface%.leases -I -df /var/lib/dhcp/dhclient6.%iface%.leases %iface% \
++    /sbin/dhclient -v -r -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     /sbin/pump -i %iface% -r \
+         elsif (execable("/sbin/pump"))
+@@ -187,10 +187,10 @@ method wvdial
+     provider name  -- Use /name/ as the provider (from /etc/wvdial.conf).
+   up
+     /sbin/start-stop-daemon --start -x /usr/bin/wvdial \
+-                      -p /run/wvdial.%iface%.pid -b -m -- [[ %provider% ]]
++                      -p %snap-data%/run/wvdial.%iface%.pid -b -m -- [[ %provider% ]]
+   down
+     /sbin/start-stop-daemon --stop -x /usr/bin/wvdial \
+-                      -p /run/wvdial.%iface%.pid -s 2
++                      -p %snap-data%/run/wvdial.%iface%.pid -s 2
+ 
+ 
+ method ipv4ll
+@@ -222,7 +222,7 @@ method static
+   description
+     This method may be used to define Ethernet interfaces with statically
+     allocated IPv4 addresses.
+-      
++
+   options
+     address address             -- Address (dotted quad/netmask) *required*
+     netmask mask                -- Netmask (dotted quad or CIDR)
+@@ -280,7 +280,7 @@ method dhcp
+ 
+   up
+     [[/sbin/ifconfig %iface% link %hwaddress%]]
+-    /sbin/dhclient -1 -v -pf /run/dhclient.%iface%.pid -lf /var/lib/dhcp/dhclient.%iface%.leases -I -df /var/lib/dhcp/dhclient6.%iface%.leases %iface% \
++    /sbin/dhclient -1 -v -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases %iface% \
+ 	[[-e IF_METRIC=%metric%]] \
+         if (execable("/sbin/dhclient"))
+     /sbin/udhcpc -n -p /run/udhcpc.%iface%.pid -i %iface% [[-H %hostname%]] \
+@@ -293,7 +293,7 @@ method dhcp
+         elsif (1)
+ 
+   down
+-    /sbin/dhclient -v -r -pf /run/dhclient.%iface%.pid -lf /var/lib/dhcp/dhclient.%iface%.leases -I -df /var/lib/dhcp/dhclient6.%iface%.leases %iface% \
++    /sbin/dhclient -v -r -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient.%iface%.pid -lf /var/lib/dhcp/dhclient.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     if test -f /run/udhcpc.%iface%.pid; then kill -USR2 $(/bin/cat /run/udhcpc.%iface%.pid); kill -TERM $(/bin/cat /run/udhcpc.%iface%.pid); fi \
+         elsif (execable("/sbin/udhcpc"))
+@@ -377,7 +377,7 @@ method static
+   description
+     This method may be used to define Ethernet interfaces with statically
+     allocated IPv4 addresses.
+-      
++
+   options
+     address address             -- Address (dotted quad/netmask) *required*
+     netmask mask                -- Netmask (dotted quad or CIDR)
+@@ -432,7 +432,7 @@ method dhcp
+ 
+   up
+     [[Warning: Option hwaddress: %hwaddress% not yet supported]]
+-    /sbin/dhclient -1 -v -pf /run/dhclient.%iface///.%.pid -lf /var/lib/dhcp/dhclient.%iface///.%.leases -I -df /var/lib/dhcp/dhclient6.%iface///.%.leases %iface% \
++    /sbin/dhclient -1 -v -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient.%iface///.%.pid -lf %snap-data%/var/lib/dhcp/dhclient.%iface///.%.leases -I -df %snap-data%/var/lib/dhcp/dhclient6.%iface///.%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     /sbin/udhcpc -n -p /run/udhcpc.%iface///.%.pid -i %iface% [[-H %hostname%]] \
+            [[-c %client%]] \
+@@ -444,7 +444,7 @@ method dhcp
+         elsif (1)
+ 
+   down
+-    /sbin/dhclient -v -r -pf /run/dhclient.%iface///.%.pid -lf /var/lib/dhcp/dhclient.%iface///.%.leases -I -df /var/lib/dhcp/dhclient6.%iface///.%.leases %iface% \
++    /sbin/dhclient -v -r -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient.%iface///.%.pid -lf %snap-data%/var/lib/dhcp/dhclient.%iface///.%.leases -I -df %snap-data%/var/lib/dhcp/dhclient6.%iface///.%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     if test -f /run/udhcpc.%iface///.%.pid; then kill -USR2 $(/bin/cat /run/udhcpc.%iface///.%.pid); kill -TERM $(/bin/cat /run/udhcpc.%iface///.%.pid); fi \
+         elsif (execable("/sbin/udhcpc"))
+diff --git a/inet6.defn b/inet6.defn
+index 49be906..98a9184 100644
+--- a/inet6.defn
++++ b/inet6.defn
+@@ -26,7 +26,7 @@ method auto
+     -/sbin/sysctl -q -e -w net.ipv6.conf.%iface/.//%.autoconf=1
+     /bin/ip link set dev %iface% up
+     /lib/ifupdown/wait-for-ll6.sh if (var_true("dhcp", ifd) && execable("/lib/ifupdown/wait-for-ll6.sh"))
+-    /sbin/dhclient -1 -6 -S -pf /run/dhclient6.%iface%.pid -lf /var/lib/dhcp/dhclient6.%iface%.leases -I -df /var/lib/dhcp/dhclient.%iface%.leases %iface% \
++    /sbin/dhclient -1 -6 -S -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface%.leases %iface% \
+         if (var_true("dhcp", ifd) && execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (var_true("dhcp", ifd))
+@@ -137,13 +137,13 @@ method dhcp
+     -[[/sbin/sysctl -q -e -w net.ipv6.conf.%iface/.//%.autoconf=%autoconf%]]
+     /bin/ip link set dev %iface% [[address %hwaddress%]] up
+     /lib/ifupdown/wait-for-ll6.sh if (execable("/lib/ifupdown/wait-for-ll6.sh"))
+-    /sbin/dhclient -1 -6 -pf /run/dhclient6.%iface%.pid -lf /var/lib/dhcp/dhclient6.%iface%.leases -I -df /var/lib/dhcp/dhclient.%iface%.leases %iface% \
++    /sbin/dhclient -1 -6 -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (1)
+ 
+   down
+-    /sbin/dhclient -6 -r -pf /run/dhclient6.%iface%.pid -lf /var/lib/dhcp/dhclient6.%iface%.leases -I -df /var/lib/dhcp/dhclient.%iface%.leases %iface% \
++    /sbin/dhclient -6 -r -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (1)
+@@ -158,7 +158,7 @@ method v4tunnel
+ 
+   options
+     address address       -- Address (colon delimited) *required*
+-    netmask mask          -- Netmask (number of bits, eg 64) 
++    netmask mask          -- Netmask (number of bits, eg 64)
+     endpoint address      -- Address of other tunnel endpoint (IPv4 \
+                              dotted quad) *required*
+     local address         -- Address of the local endpoint (IPv4 \
+@@ -282,7 +282,7 @@ method auto
+ 
+   up
+     /sbin/ifconfig %iface% inet6 accept_rtadv up
+-    /sbin/dhclient -1 -6 -S -pf /run/dhclient6.%iface%.pid -lf /var/lib/dhcp/dhclient6.%iface%.leases -I -df /var/lib/dhcp/dhclient.%iface%.leases %iface% \
++    /sbin/dhclient -1 -6 -S -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface%.leases %iface% \
+         if (var_true("dhcp", ifd) && execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (var_true("dhcp", ifd))
+@@ -306,13 +306,13 @@ method dhcp
+ 
+   up
+     /sbin/ifconfig %iface% [[link %hwaddress%]] up
+-    /sbin/dhclient -1 -6 -pf /run/dhclient6.%iface%.pid -lf /var/lib/dhcp/dhclient6.%iface%.leases -I -df /var/lib/dhcp/dhclient.%iface%.leases %iface% \
++    /sbin/dhclient -1 -6 -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (1)
+ 
+   down
+-    /sbin/dhclient -6 -r -pf /run/dhclient6.%iface%.pid -lf /var/lib/dhcp/dhclient6.%iface%.leases -I -df /var/lib/dhcp/dhclient.%iface%.leases %iface% \
++    /sbin/dhclient -6 -r -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (1)
+@@ -378,16 +378,15 @@ method dhcp
+   up
+     [[Warning: Option hwaddress: %hwaddress% not yet supported]]
+     inetutils-ifconfig --interface %iface% --up
+-    /sbin/dhclient -1 -6 -pf /run/dhclient6.%iface///.%.pid -lf /var/lib/dhcp/dhclient6.%iface///.%.leases -I -df /var/lib/dhcp/dhclient.%iface///.%.leases %iface% \
++    /sbin/dhclient -1 -6 -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface///.%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface///.%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface///.%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (1)
+ 
+   down
+-    /sbin/dhclient -6 -r -pf /run/dhclient6.%iface///.%.pid -lf /var/lib/dhcp/dhclient6.%iface///.%.leases -I -df /var/lib/dhcp/dhclient.%iface///.%.leases %iface% \
++    /sbin/dhclient -6 -r -cf %snap-common%/etc/dhcp/dhclient.conf -sf %snap-common%/sbin/dhclient-script -pf %snap-data%/run/dhclient6.%iface///.%.pid -lf %snap-data%/var/lib/dhcp/dhclient6.%iface///.%.leases -I -df %snap-data%/var/lib/dhcp/dhclient.%iface///.%.leases %iface% \
+         if (execable("/sbin/dhclient"))
+     echo 'No DHCPv6 client software found!' >/dev/stderr; false \
+         elsif (1)
+ 
+     inetutils-ifconfig --interface %iface% --down
+-
+diff --git a/main.c b/main.c
+index 80eddb0..9171522 100644
+--- a/main.c
++++ b/main.c
+@@ -22,9 +22,11 @@ bool ignore_failures = false;
+ 
+ interfaces_file *defn;
+ 
+-static char lockfile[] = RUN_DIR ".ifstate.lock";
+-static char statefile[] = RUN_DIR "ifstate";
+-static char tmpstatefile[] = RUN_DIR ".ifstate.tmp";
++static char lockfile[256] = RUN_DIR ".ifstate.lock";
++static char statefile[256] = RUN_DIR "ifstate";
++static char tmpstatefile[256] = RUN_DIR ".ifstate.tmp";
++static char *snapCommon = NULL;
++static char *snapData = NULL;
+ 
+ static void usage() {
+ 	fprintf(stderr, "%s: Use --help for help\n", argv0);
+@@ -359,7 +361,14 @@ bool make_pidfile_name(char *name, size_t size, const char *command, interface_d
+ 
+ 	sanitize_file_name(iface);
+ 
+-	int n = snprintf(name, size, RUN_DIR "%s-%s.pid", command, iface);
++	int n = -1;
++	//snprintf(name, size, RUN_DIR "%s-%s.pid", command, iface);
++	if (snapData) {
++		n = snprintf(name, size, "%s%s%s-%s.pid", snapData, RUN_DIR, command, iface);
++	} else {
++		n = snprintf(name, size, RUN_DIR "%s-%s.pid", command, iface);
++	}
++        fprintf(stderr, "pidfile: [%s]\n", name);
+ 
+ 	free(iface);
+ 
+@@ -479,7 +488,7 @@ static void parse_options(int *argc, char **argv[]) {
+ 		{"read-environment", no_argument, NULL, 8},
+ 		{0, 0, 0, 0}
+ 	};
+-
++  char *prefix = NULL;
+ 	for (;;) {
+ 		int c = getopt_long(*argc, *argv, "X:s:i:o:hVvnal", long_opts, NULL);
+ 
+@@ -1168,6 +1177,7 @@ end:
+ 
+ int main(int argc, char *argv[]) {
+ 	argv0 = argv[0];
++        char runDir[256];
+ 
+ 	check_stdio();
+ 
+@@ -1175,7 +1185,27 @@ int main(int argc, char *argv[]) {
+ 
+ 	parse_options(&argc, &argv);
+ 
+-	mkdir(RUN_DIR, 0755);
++	snapCommon = getenv("SNAP_COMMON");
++	snapData = getenv("SNAP_DATA");
++	if(snapData) {
++		snprintf(lockfile, sizeof lockfile, "%s%s%s", snapData, RUN_DIR, ".ifstate.lock");
++		snprintf(statefile, sizeof statefile, "%s%s%s", snapData, RUN_DIR, "ifstate");
++		snprintf(tmpstatefile, sizeof tmpstatefile, "%s%s%s", snapData, RUN_DIR, ".ifstate.tmp");
++		snprintf(runDir, sizeof runDir, "%s%s", snapData, RUN_DIR);
++		fprintf(stderr, "paths:[ %s, %s, %s, %s ]\n", runDir, lockfile,statefile, tmpstatefile);
++	  mkdir(runDir, 0755);
++	}	else {
++	  mkdir(RUN_DIR, 0755);
++	}
++
++	if (snapCommon) {
++		int sz = (strlen(interfaces) + strlen(snapCommon)+1) * sizeof (char);
++		interfaces = (char*)malloc(sz);
++		if (interfaces) {
++		    snprintf(interfaces, sz, "%s%s", snapCommon, "/etc/network/interfaces");
++		}
++		fprintf(stderr, "interfaces:[%s]\n", interfaces);
++	}
+ 
+ 	if (state_query)
+ 		return do_state(argc, argv);

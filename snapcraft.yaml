@@ -364,7 +364,6 @@ parts:
             - ethtool
             - wireless-tools
             - wpasupplicant
-            - ifupdown
         stage:
             - -etc/bind/named.conf
             - -etc/bind/zones.rfc1918
@@ -395,6 +394,19 @@ parts:
                    $SNAPCRAFT_PART_INSTALL/sbin/dhclient-script
             find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i 's#=/sbin/#=${SNAP}/sbin/#g' {} \;
             find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i 's#/usr/sbin/#${SNAP}/usr/sbin/#g' {} \;
+
+    ifupdown:
+        source: https://git.launchpad.net/ubuntu/+source/ifupdown
+        source-branch: ubuntu/xenial-devel
+        source-type: git
+        plugin: make
+        override-pull: |
+            snapcraftctl pull
+            git apply ../../../ifupdown.patch
+        override-build: |
+            snapcraftctl build
+            ln -sf ifup $SNAPCRAFT_PART_INSTALL/sbin/ifdown
+            ln -sf ifup $SNAPCRAFT_PART_INSTALL/sbin/ifquery
 
     # java run time
     jre:
