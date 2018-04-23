@@ -208,7 +208,9 @@ parts:
                 kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/dns/LinuxDns.java
             sed -i \
                   -e '/Logger logger/a \    private static final String SNAP_DATA = System.getProperty("kura.data.snap.data");' \
+                  -e '/Logger logger/a \    private static final String SNAP = System.getProperty("kura.os.snap");' \
                   -e 's/\"\/var\/lock\/LCK/SNAP_DATA + &/' \
+                  -e 's/\"\/usr\/sbin\/pppd\"/SNAP + &/' \
                 kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/ppp/PppLinux.java \
                 kura/org.eclipse.kura.linux.net/src/main/java/org/eclipse/kura/linux/net/modem/SerialModemDriver.java
             sed -i \
@@ -364,6 +366,7 @@ parts:
             - ethtool
             - wireless-tools
             - wpasupplicant
+            - ppp
         stage:
             - -etc/bind/named.conf
             - -etc/bind/zones.rfc1918
