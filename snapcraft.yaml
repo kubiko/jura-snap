@@ -27,21 +27,23 @@ slots:
   service:
     interface: bluez
 
-layout:
-    /etc/sysconfig:
-        bind: $SNAP_COMMON/etc/sysconfig
-    /etc/bind:
-        bind: $SNAP_COMMON/etc/bind
-    /etc/hostapd:
-        bind: $SNAP_COMMON/etc/hostapd
-    /etc/network:
-        bind: $SNAP_COMMON/etc/network
-    /etc/wpa_supplicant:
-        bind: $SNAP_COMMON/etc/wpa_supplicant
-    /etc/init.d/firewall:
-        bind-file:  $SNAP/etc/init.d/firewall
-    /etc/adjtime:
-        bind-file: $SNAP_COMMON/etc/adjtime
+passthrough:
+  layout:
+      /etc/sysconfig:
+          bind: $SNAP_COMMON/etc/sysconfig
+      /etc/bind:
+          bind: $SNAP_COMMON/etc/bind
+      /etc/hostapd:
+          bind: $SNAP_COMMON/etc/hostapd
+      /etc/network:
+          bind: $SNAP_COMMON/etc/network
+      /etc/wpa_supplicant:
+          bind: $SNAP_COMMON/etc/wpa_supplicant
+      /etc/init.d/firewall:
+          bind-file:  $SNAP/etc/init.d/firewall
+      /etc/adjtime:
+          bind-file: $SNAP_COMMON/etc/adjtime
+
 apps:
 #    service:
 #        command: kura-control start_kura_backgroud.sh
