@@ -125,7 +125,8 @@ parts:
             - maven
             - gawk
         # first tweak source for snap building
-        prepare: |
+        override-pull: |
+            snapcraftctl pull
             sed -i \
                   -e '/int result;/a logger.info("OK:" + OS_VERSION + "raspi-Name:" + KuraConstants.Raspberry_Pi.getImageName() );' \
                   -e '/int result;/a logger.info("OK: snap: " + System.getProperty("kura.os.snap") );' \
@@ -263,12 +264,10 @@ parts:
                   -e 's#/etc/network/interfaces#${SNAP_COMMON}/etc/network/interfaces#g' \
                 kura/distrib/src/main/resources/common/i*
 
-        build: |
+        override-build: |
             ./build-all.sh $(mvn -N -f kura/distrib/pom.xml help:all-profiles | grep "Profile Id" | awk \
                -v profile=raspberry-pi-2-$(if [ "$(echo $SNAPCRAFT_PROJECT_NAME | tail -c 4)" = "-nn" ];then echo "3-nn"; else echo "3";fi) \
                '{ if($3 == profile){print "-P"$3}else{print "-P!"$3 }}' | sort -u | tr '\n' ' ')
-
-        install: |
             unzip kura/distrib/target/kura_*_raspberry-pi-2$(if [ "$(echo $SNAPCRAFT_PROJECT_NAME | tail -c 4)" = "-nn" ];then echo "*-nn";fi).zip -d $SNAPCRAFT_PART_INSTALL/
             mv $SNAPCRAFT_PART_INSTALL/kura_* $SNAPCRAFT_PART_INSTALL/kura
             # tweak some config settings
@@ -362,7 +361,8 @@ parts:
             - -etc/bind/zones.rfc1918
             - -etc/network/if-down.d/upstart
             - -etc/network/if-up.d/upstart
-        install: |
+        override-build: |
+            snapcraftctl build
             # fix bind9 and dependencies
             sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
                    -e 's#/run/named#${SNAP_DATA}/run/named#g' \
