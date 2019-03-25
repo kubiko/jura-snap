@@ -81,7 +81,7 @@ parts:
     kura:
         plugin: kura
         source: https://github.com/kubiko/kura.git
-        source-branch: develop-snap
+        source-branch: release-4.0.0-snap
         after:
             - build-jdk
         build-packages:
