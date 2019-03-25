@@ -1,0 +1,10 @@
+#!/bin/bash
+
+echo "$(date '+%Y-%m-%d %H:%M:%S'): Entering ${hook_name} hook"
+echo "SNAP_REVISION=${SNAP_REVISION}"
+
+# if we have backup, try to restore previous network configuration
+if [ "${KURA_NET}" = "true" ]; then
+    ${SNAP}/kura/install/configure-netplan.sh remove || true
+fi
+
