@@ -1,0 +1,11 @@
+#!/bin/bash
+
+hook_name=$(basename $0)
+
+set -x
+exec > $SNAP_DATA/hook-${hook_name}.log 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S'): Entering ${hook_name} hook"
+echo "SNAP_REVISION=${SNAP_REVISION}"
+
+$SNAP/kura/install/kura_upgrade.sh || true
+
