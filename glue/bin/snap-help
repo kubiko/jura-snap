@@ -1,0 +1,57 @@
+#!/bin/bash
+
+echo -e "${SNAP_NAME}: configuration help\n"
+echo -e "Make sure you have connected all interfaces, check more by calling $ snap interfaces"
+echo -e "Basic set can connected using helper script $ /snap/$SNAP_NAME/current/bin/connect-interfaces\n"
+# parse config file for supported settings keys
+echo -e "${SNAP_NAME} supports settings keys"
+echo -e "values can be changed by calling\n$ snap set $SNAP_NAME <key name>='<key value>'"
+echo -e "list of supported keys:"
+
+processing_top_key_start() {
+    TAB="${TAB}\t"
+    echo -e "${TAB}${1}"
+}
+
+processing_top_key_end() {
+    TAB=${TAB%"\t"}
+    echo -e "\n"
+}
+
+handle_key_value() {
+    key=$1
+    shift
+    echo -e "${TAB}\t${key}\t$@"
+}
+
+# callback function to process one configuration
+# apply_config ${key} ${env} ${value} ${default} ${description}
+apply_config() {
+    echo -e "${TAB}\t${1}:   ${5}"
+    if [ "x${3}" == "x" ]; then
+        echo -e "${TAB}\t\tNo value set, using default value: '${4}'"
+    else
+        echo -e "${TAB}\t\tCurrent value set to: '${3}', (default value: '${4}')"
+    fi
+}
+
+
+# callback function to process settings in file
+# apply_settings ${key} ${file} ${conf} ${value} ${default} ${description}
+apply_settings() {
+    echo -e "${TAB}\t${1}:   ${6}"
+    echo -e "${TAB}\t\tfile: ${2}"
+    echo -e "${TAB}\t\tconfiguration: ${3}"
+    if [ "x${4}" == "x" ]; then
+        echo -e "${TAB}\t\tNo value set, using default value: '${5}'"
+    else
+        echo -e "${TAB}\t\tCurrent value set to: '${4}', (default value: '${5}')"
+    fi
+}
+
+source ${SNAP}/bin/snap-config
+read_snap_config
+
+
+
+echo -e "${SNAP_NAME} restarts when configuration is changed to apply changes!!\n"
