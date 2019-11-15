@@ -303,11 +303,23 @@ parts:
 
     # java run time
     jre:
-        plugin: dump
-        source:
-            - to armhf: http://cdn.azul.com/zulu-embedded/bin/zulu8.31.1.122-jdk1.8.0_181-linux_aarch32hf.tar.gz
-            - to arm64: http://cdn.azul.com/zulu-embedded/bin/zulu8.31.1.122-jdk1.8.0_181-linux_aarch64.tar.gz
-            - to amd64: https://cdn.azul.com/zulu/bin/zulu8.31.0.1-jdk8.0.181-linux_x64.tar.gz
+        plugin: nil
+        override-pull: |
+            wget -O index.html https://www.azul.com/downloads/zulu-community
+            grep "JSON.stringify(sortArray(" index.html | sed -e "s/localStorage.setItem('arrayZuluBandlesZulu', JSON.stringify(sortArray(//g" -e "s/)));//g" > index.json
+            echo "SNAPCRAFT_ARCH_TRIPLET=${SNAPCRAFT_ARCH_TRIPLET}"
+            if [ "${SNAPCRAFT_ARCH_TRIPLET}" = "arm-linux-gnueabihf" ]; then
+                jq -c 'sort_by(.zulu_version) | .[] | select( .arch == "ARM 32-bit HF" ) | select( .category == "Java 8 (LTS)" ) | select( .arch_slug = "arm-32-bit-hf" ) | select( .packaging_slug == "jdk" ) | select(.os|index( "Linux" ))' index.json | jq -sr '.[-1]' > ${SNAPCRAFT_PART_INSTALL}/zulu_version.json
+            elif [ "${SNAPCRAFT_ARCH_TRIPLET}" = "aarch64-linux-gnu" ]; then
+                jq -c 'sort_by(.zulu_version) | .[] | select( .arch == "ARM 64-bit" ) | select( .category == "Java 8 (LTS)" ) | select( .arch_slug = "arm-64-bit" ) | select( .packaging_slug == "jdk" ) | select(.os|index( "Linux" ))' index.json | jq -sr '.[-1]' > ${SNAPCRAFT_PART_INSTALL}/zulu_version.json
+            elif [ "${SNAPCRAFT_ARCH_TRIPLET}" = "x86_64-linux-gnu" ]; then
+                jq -c 'sort_by(.zulu_version) | .[] | select( .arch == "x86 64-bit" ) | select( .category == "Java 8 (LTS)" ) | select( .arch_slug = "x86-64-bit" ) | select( .packaging_slug == "jdk" ) | select(.os|index( "Linux" ))' index.json | jq -sr '.[-1]' > ${SNAPCRAFT_PART_INSTALL}/zulu_version.json
+            else
+                jq -c 'sort_by(.zulu_version) | .[] | select( .arch == "x86 32-bit" ) | select( .category == "Java 8 (LTS)" ) | select( .arch_slug = "x86-32-bit" ) | select( .packaging_slug == "jdk" ) | select(.os|index( "Linux" ))' index.json | jq -sr '.[-1]' > ${SNAPCRAFT_PART_INSTALL}/zulu_version.json
+            fi
+            tar_link=$(jq -r '.bundles[] | select (.extension == "tar.gz") | .link' ${SNAPCRAFT_PART_INSTALL}/zulu_version.json )
+            wget -O zulu.tar.gz ${tar_link}
+            tar -C ${SNAPCRAFT_PART_INSTALL} -xf zulu.tar.gz --strip 1
         stage:
             - -bin
             - -demo
@@ -320,6 +332,9 @@ parts:
             - -jre/lib/aarch64/server/libjvm.diz
         organize:
             LICENSE: LICENSE_ZULU
+            release: release_zulu
+        build-packages:
+            - jq
 
     glue:
         plugin: dump
