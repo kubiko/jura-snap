@@ -78,6 +78,18 @@ apps:
         adapter: none
 
 parts:
+    # use zulu for build
+    build-jdk:
+        plugin: dump
+        source:
+            - on armhf: https://cdn.azul.com/zulu-embedded/bin/zulu8.42.0.195-ca-jdk1.8.0_232-linux_aarch32hf.tar.gz
+            - on arm64: https://cdn.azul.com/zulu-embedded/bin/zulu8.42.0.195-ca-jdk1.8.0_232-linux_aarch64.tar.gz
+            - on amd64: https://cdn.azul.com/zulu/bin/zulu8.42.0.23-ca-jdk8.0.232-linux_x64.tar.gz
+        organize:
+            '*': build-jdk/
+        prime:
+            - '-*'
+
     kura:
         plugin: kura
         source: https://github.com/kubiko/kura.git
@@ -99,6 +111,9 @@ parts:
             - kura
             - kura/distrib
         override-build: |
+            # use build-jdk instead
+            export BUILD_JDK=${SNAPCRAFT_STAGE}/build-jdk/bin
+            export JAVA_HOME=${SNAPCRAFT_STAGE}/build-jdk
             snapcraftctl build
             unzip kura/distrib/target/kura_*_ubuntu-snap.zip -d ${SNAPCRAFT_PART_INSTALL}/
             mv ${SNAPCRAFT_PART_INSTALL}/kura_* ${SNAPCRAFT_PART_INSTALL}/kura
@@ -164,17 +179,6 @@ parts:
             - etc/network/if-down.d/ifdown-local
             - etc/network/if-up.d/ifup-local
             - bin/configuration.json
-
-    build-jdk:
-        plugin: dump
-        source:
-            - on armhf: http://cdn.azul.com/zulu-embedded/bin/zulu8.31.1.122-jdk1.8.0_181-linux_aarch32hf.tar.gz
-            - on arm64: http://cdn.azul.com/zulu-embedded/bin/zulu8.31.1.122-jdk1.8.0_181-linux_aarch64.tar.gz
-            - on amd64: https://cdn.azul.com/zulu/bin/zulu8.31.0.1-jdk8.0.181-linux_x64.tar.gz
-        organize:
-            '*': build-jdk/
-        prime:
-            - '-*'
 
     tools:
         plugin: nil
