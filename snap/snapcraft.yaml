@@ -101,6 +101,7 @@ parts:
             - maven
             - gawk
             - zip
+        maven-openjdk-version: "8"
         maven-options:
             - '-Pubuntu-snap'
             - -B
@@ -115,7 +116,14 @@ parts:
             export BUILD_JDK=${SNAPCRAFT_STAGE}/build-jdk/bin
             export JAVA_HOME=${SNAPCRAFT_STAGE}/build-jdk
             snapcraftctl build
-            unzip kura/distrib/target/kura_*_ubuntu-snap.zip -d ${SNAPCRAFT_PART_INSTALL}/
+            case ${SNAPCRAFT_PROJECT_NAME} in
+                *-nn)
+                  unzip kura/distrib/target/kura_*_ubuntu-snap-nn.zip -d ${SNAPCRAFT_PART_INSTALL}/
+                  ;;
+                *)
+                  unzip kura/distrib/target/kura_*_ubuntu-snap.zip -d ${SNAPCRAFT_PART_INSTALL}/
+                  ;;
+            esac
             mv ${SNAPCRAFT_PART_INSTALL}/kura_* ${SNAPCRAFT_PART_INSTALL}/kura
             # tweak some config settings
             chmod +x ${SNAPCRAFT_PART_INSTALL}/kura/install/*.raspbian
@@ -140,28 +148,6 @@ parts:
             new_bundles=$(grep "osgi.bundles=" ${SNAPCRAFT_PART_INSTALL}/kura/framework/config.ini \
                 | awk  '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}' \
                 | sed -e 's/'"${host_arch}"'/'"${target_arch}"'/g')
-            case ${SNAPCRAFT_PROJECT_NAME} in
-                *-nn)
-                    echo "Building NO-network version snap, removing network bundles"
-                    linux_net=$(echo ${new_bundles} | tr ' ' '\n' | grep org.eclipse.kura.linux.net_ | sed 's/[\/&]/\\&/g')
-                    net_admin=$(echo ${new_bundles} | tr ' ' '\n' | grep org.eclipse.kura.net.admin_ | sed 's/[\/&]/\\&/g')
-                    deb_provider=$(echo ${new_bundles} | tr ' ' '\n' | grep org.eclipse.kura.linux.debian.provider_ | sed 's/[\/&]/\\&/g')
-                    snap_provider=$(echo ${new_bundles} | tr ' ' '\n' | grep org.eclipse.kura.linux.snapctl.provider_ | sed 's/[\/&]/\\&/g')
-                    new_bundles=$(echo ${new_bundles} | \
-                        sed -e 's#'"${linux_net}"'##g' \
-                            -e 's#'"${net_admin}"'##g' \
-                            -e 's#'"${deb_provider}"'##g' \
-                            -e 's#'"${snap_provider}"'##g')
-                    ;;
-                *)
-                    echo "Building network version snap, removing emulator bundles"
-                    emulator=$(echo ${new_bundles} | tr ' ' '\n' | grep org.eclipse.kura.emulator_ | sed 's/[\/&]/\\&/g')
-                    emulator_net=$(echo ${new_bundles} | tr ' ' '\n' | grep org.eclipse.kura.emulator.net_ | sed 's/[\/&]/\\&/g')
-                    new_bundles=$(echo ${new_bundles} | \
-                        sed -e 's#'"${emulator}"'##g' \
-                            -e 's#'"${emulator_net}"'##g')
-                    ;;
-            esac
             new_bundles=$(echo ${new_bundles} | sed 's/[\/&]/\\&/g')
             sed -i -e 's/osgi.bundles=.*/'"${new_bundles}"'/g' ${SNAPCRAFT_PART_INSTALL}/kura/framework/config.ini
 
