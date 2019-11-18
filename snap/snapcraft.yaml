@@ -343,4 +343,109 @@ parts:
         plugin: dump
         source: glue
 
+    # network
+    net:
+        plugin: nil
+        stage-packages:
+            - to armhf:
+                - bind9:armhf
+                - bind9-host:armhf
+                - ethtool:armhf
+                - hostapd:armhf
+                - ifupdown:armhf
+                - iproute2:armhf
+                - iptables:armhf
+                - isc-dhcp-server:armhf
+                - iw:armhf
+                - libexpat1:armhf
+                - libffi6:armhf
+                - libmnl0:armhf
+                - libmpdec2:armhf
+                - libsqlite3-0:armhf
+                - libssl1.1:armhf
+                - net-tools:armhf
+                - wireless-tools:armhf
+                - isc-dhcp-client:armhf
+            - to arm64:
+                - bind9:arm64
+                - bind9-host:arm64
+                - ethtool:arm64
+                - hostapd:arm64
+                - ifupdown:arm64
+                - iproute2:arm64
+                - iptables:arm64
+                - isc-dhcp-server:arm64
+                - iw:arm64
+                - libexpat1:arm64
+                - libffi6:arm64
+                - libmnl0:arm64
+                - libmpdec2:arm64
+                - libsqlite3-0:arm64
+                - libssl1.1:arm64
+                - net-tools:arm64
+                - wireless-tools:arm64
+                - isc-dhcp-client:arm64
+            - to amd64:
+                - bind9:amd64
+                - bind9-host:amd64
+                - ethtool:amd64
+                - hostapd:amd64
+                - ifupdown:amd64
+                - iproute2:amd64
+                - iptables:amd64
+                - isc-dhcp-server:amd64
+                - iw:amd64
+                - libexpat1:amd64
+                - libffi6:amd64
+                - libmnl0:amd64
+                - libmpdec2:amd64
+                - libsqlite3-0:amd64
+                - libssl1.1:amd64
+                - net-tools:amd64
+                - wireless-tools:amd64
+                - isc-dhcp-client:amd64
+        stage:
+            - -etc/bind/named.conf
+            - -etc/bind/zones.rfc1918
+            - -etc/network/if-down.d/upstart
+            - -etc/network/if-up.d/upstart
+            - -usr/lib/python2.7
+        override-build: |
+            snapcraftctl build
+            cp -r /snap/core18/current/etc/dhcp $SNAPCRAFT_PART_INSTALL/etc/
+            # fix bind9 and dependencies
+            sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
+                   -e 's#/run/named#${SNAP_DATA}/run/named#g' \
+                   -e 's#/run/hostapd#${SNAP_DATA}/run/hostapd#g' \
+                   -e 's#/run/openvpn#${SNAP_DATA}/run/openvpn#g' \
+                   -e 's#/var/run/#${SNAP_DATA}/var/run/#g' \
+                   -e 's#/etc/default#${SNAP_DATA}/etc/default#g' \
+                   -e 's|chown.*|# chown: not allowed from snap|g' \
+                   $SNAPCRAFT_PART_INSTALL/etc/init.d/*
 
+            awk -i inplace '1;/RESOLVCONF=no/{ print "echo \"SNAP=${SNAP}\""}' \
+                   $SNAPCRAFT_PART_INSTALL/etc/init.d/bind9
+
+            sed -i -e 's#/usr/sbin/#${SNAP}/usr/sbin/#g' \
+                   -e 's#/run/hostapd#${SNAP_DATA}/run/hostapd#g' \
+                   -e 's#/run/sendsigs#${SNAP_DATA}/run/sendsigs#g' \
+                   $SNAPCRAFT_PART_INSTALL/etc/hostapd/*
+
+            find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i 's#=/sbin/#=${SNAP}/sbin/#g' {} \;
+            find $SNAPCRAFT_PART_INSTALL/etc/network/ -type f -exec sed -i 's#/usr/sbin/#${SNAP}/usr/sbin/#g' {} \;
+
+            # install manually python3-ply, if we add it as stage-package it pulls in python as dependency
+            apt-get download python3-ply
+            if [ "$(arch)" = "x86_64" ]; then
+                if [ "${SNAPCRAFT_ARCH_TRIPLET}" = "arm-linux-gnueabihf" ]; then
+                    apt-get download bind9utils:armhf
+                elif [ "${SNAPCRAFT_ARCH_TRIPLET}" = "aarch64-linux-gnu" ]; then
+                    apt-get download bind9utils:arm64
+                else
+                    apt-get download bind9utils
+                fi
+            else
+                apt-get download bind9utils
+            fi
+            /usr/bin/dpkg-deb -x python3-ply*.deb ${SNAPCRAFT_PART_INSTALL}
+            /usr/bin/dpkg-deb -x bind9utils*.deb  ${SNAPCRAFT_PART_INSTALL}
