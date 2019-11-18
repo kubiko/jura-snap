@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# callback function to process one configuration
+# apply_config ${key} ${ENV} ${VALUE} ${DEFAULT} ${DESCRIPTION}
+apply_config() {
+    local VAL=${3}
+    [ -z "${VAL}" ] && VAL=${4}
+    echo "${2}=${VAL}"
+    eval export ${2}=\"${VAL}\"
+}
+
+# read settings
+source ${SNAP}/bin/snap-config
+read_snap_config
+
+if [ "$SNAP_ARCH" = "armhf" ]; then
+  KURA_ARCH="armv7_hf"
+elif [ "$SNAP_ARCH" = "arm64" ]; then
+  KURA_ARCH="aarch64"
+else
+  KURA_ARCH="x86_64"
+fi
+
+if [ "${KURA_NET}" = "true" ] && [ "$(snapctl get kura.net-configured)" != "true" ]; then
+    # this is kura version of snap, but looks like network is not yet configured, try again
+    # this could have been caused by lack of network-control permissions at install time
+    ${SNAP}/kura/install/kura_install.sh || true
+fi
+
