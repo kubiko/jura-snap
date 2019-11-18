@@ -87,6 +87,76 @@ apps:
 
 
 parts:
+    kura:
+        plugin: nil
+        build-packages:
+            - unzip
+            - maven
+            - gawk
+            - zip
+            - wget
+        override-pull: |
+            case ${SNAPCRAFT_PROJECT_NAME} in
+                *-nn)
+                  wget https://people.canonical.com/~okubik/kura_SNAPSHOT_ubuntu-snap-nn.zip \
+                       -O ${SNAPCRAFT_PART_SRC}/kura_SNAPSHOT_ubuntu-snap-nn.zip
+                  ;;
+                *)
+                  wget https://people.canonical.com/~okubik/kura_SNAPSHOT_ubuntu-snap.zip \
+                       -O ${SNAPCRAFT_PART_SRC}/kura_SNAPSHOT_ubuntu-snap.zip
+                  ;;
+            esac
+        override-build: |
+            KURA_DIST_TARGET_DIR=${SNAPCRAFT_PART_BUILD}
+            case ${SNAPCRAFT_PROJECT_NAME} in
+                *-nn)
+                  unzip ${KURA_DIST_TARGET_DIR}/kura_*_ubuntu-snap-nn.zip -d ${SNAPCRAFT_PART_INSTALL}/
+                  ;;
+                *)
+                  unzip ${KURA_DIST_TARGET_DIR}/kura_*_ubuntu-snap.zip -d ${SNAPCRAFT_PART_INSTALL}/
+                  ;;
+            esac
+            mv ${SNAPCRAFT_PART_INSTALL}/kura_* ${SNAPCRAFT_PART_INSTALL}/kura
+            # tweak some config settings
+            chmod +x ${SNAPCRAFT_PART_INSTALL}/kura/install/*.raspbian
+            chmod +x ${SNAPCRAFT_PART_INSTALL}/kura/install/*.init
+            chmod +x ${SNAPCRAFT_PART_INSTALL}/kura/install/if*-local*
+            chmod +x ${SNAPCRAFT_PART_INSTALL}/kura/install/*.sh
+            chmod +x ${SNAPCRAFT_PART_INSTALL}/kura/install/recover_default_config.init
+            snapcraftctl set-version \
+                $(grep '^version=' ${SNAPCRAFT_PART_INSTALL}/kura/framework/kura.properties | awk -F '=' '{ print $2}')
+            # process config.ini, remove duplicates, alter architecture if needed
+            host_arch=$(arch)
+            if [ "${SNAPCRAFT_ARCH_TRIPLET}" = "arm-linux-gnueabihf" ]; then
+                target_arch="armv6hf"
+            elif [ "${SNAPCRAFT_ARCH_TRIPLET}" = "aarch64-linux-gnu" ]; then
+                target_arch="aarch64"
+            elif [ "${SNAPCRAFT_ARCH_TRIPLET}" = "x86_64-linux-gnu" ]; then
+                target_arch="x86_64"
+            else
+                echo "Building for unsupported target architecture!!!!!"
+                exit 1
+            fi
+
+            new_bundles=$(grep "osgi.bundles=" ${SNAPCRAFT_PART_INSTALL}/kura/framework/config.ini \
+                | awk  '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}' \
+                | sed -e 's/'"${host_arch}"'/'"${target_arch}"'/g')
+            new_bundles=$(echo ${new_bundles} | sed 's/[\/&]/\\&/g')
+            sed -i -e 's/osgi.bundles=.*/'"${new_bundles}"'/g' ${SNAPCRAFT_PART_INSTALL}/kura/framework/config.ini
+
+        organize:
+            kura/install/firewall.init:               etc/init.d/firewall
+            kura/install/iptables.init:               etc/sysconfig/iptables
+            kura/install/ifdown-local:                etc/network/if-down.d/ifdown-local
+            kura/install/ifup-local.snap:             etc/network/if-up.d/ifup-local
+            kura/install/recover_default_config.init: kura/bin/.recoverDefaultConfig.sh
+            kura/install/configuration.json:          bin/configuration.json
+        stage:
+            - kura
+            - etc/network/if-down.d/ifdown-local
+            - etc/network/if-up.d/ifup-local
+            - bin/configuration.json
+
     tools:
         plugin: nil
         stage-packages:
