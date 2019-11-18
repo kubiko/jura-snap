@@ -1,0 +1,16 @@
+name: kura-nn
+
+summary: Eclipse Kura™, An OSGi-based Application Framework for M2M Service Gateways
+description: |
+   Until recently, machine-to-machine projects have been approached as embedded systems
+   designed around custom hardware, custom software, and custom network connectivity.
+   The challenge of developing such projects was given by the large customization
+   and integration costs and the small re-usability across similar engagements.
+   The results were often proprietary systems leveraging proprietary protocols.
+
+confinement: strict
+grade: stable
+adopt-info: kura
+base: core18
+
+
