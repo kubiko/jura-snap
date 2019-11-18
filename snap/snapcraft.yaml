@@ -1,4 +1,4 @@
-name: kura-nn
+name: kura
 
 summary: Eclipse Kura™, An OSGi-based Application Framework for M2M Service Gateways
 description: |
@@ -17,6 +17,7 @@ environment:
     JAVA_HOME: $SNAP/jre
     PATH: $SNAP/jre/bin:$SNAP/usr/sbin:$SNAP/usr/bin:$SNAP/sbin:$SNAP/bin:$PATH
     LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$SNAP_LIBRARY_PATH:$SNAP/lib/${SNAPCRAFT_ARCH_TRIPLET}:$SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}:$LD_LIBRARY_PATH
+    KURA_NET: "true"
 
 apps:
     kura:
@@ -36,6 +37,9 @@ apps:
             - netlink-audit
             - network
             - network-bind
+            - firewall-control
+            - network-control
+            - network-setup-control
             - ppp
             - process-control
             - raw-usb
@@ -62,6 +66,9 @@ apps:
             - netlink-audit
             - network
             - network-bind
+            - firewall-control
+            - network-control
+            - network-setup-control
             - ppp
             - process-control
             - raw-usb
@@ -85,6 +92,23 @@ apps:
         command: bin/snap-help
         adapter: none
 
+    named:
+        command: "usr/sbin/named -f -c $SNAP_COMMON/etc/bind/named.conf"
+        adapter: none
+        daemon: simple
+        stop-command: usr/sbin/rndc stop
+        plugs:
+            - network
+            - network-bind
+            - network-control
+
+    firewall:
+      command: etc/init.d/firewall
+      adapter: none
+      daemon: oneshot
+      plugs:
+            - network
+            - firewall-control
 
 parts:
     kura:
@@ -153,6 +177,8 @@ parts:
             kura/install/configuration.json:          bin/configuration.json
         stage:
             - kura
+            - etc/init.d/firewall
+            - etc/sysconfig/iptables
             - etc/network/if-down.d/ifdown-local
             - etc/network/if-up.d/ifup-local
             - bin/configuration.json
