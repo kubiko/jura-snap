@@ -18,4 +18,72 @@ environment:
     PATH: $SNAP/jre/bin:$SNAP/usr/sbin:$SNAP/usr/bin:$SNAP/sbin:$SNAP/bin:$PATH
     LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$SNAP_LIBRARY_PATH:$SNAP/lib/${SNAPCRAFT_ARCH_TRIPLET}:$SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}:$LD_LIBRARY_PATH
 
+apps:
+    kura:
+        command: kura/bin/start_kura_snap.sh
+        adapter: none
+        daemon: simple
+        plugs: 
+            - bluez
+            - bluetooth-control
+            - gpio
+            - hardware-observe
+            - home
+            - i2c
+            - io-ports-control
+            - log-observe
+            - mount-observe
+            - netlink-audit
+            - network
+            - network-bind
+            - ppp
+            - process-control
+            - raw-usb
+            - removable-media
+            - serial-port
+            - spi
+            - shutdown
+            - system-observe
+            - time-control
+
+    debug:
+        command: kura/bin/start_kura_snap_debug.sh
+        adapter: none
+        plugs:
+            - bluez
+            - bluetooth-control
+            - gpio
+            - hardware-observe
+            - home
+            - i2c
+            - io-ports-control
+            - log-observe
+            - mount-observe
+            - netlink-audit
+            - network
+            - network-bind
+            - ppp
+            - process-control
+            - raw-usb
+            - removable-media
+            - serial-port
+            - spi
+            - shutdown
+            - system-observe
+            - time-control
+
+    monit:
+        command: usr/bin/monit -I -c $SNAP_COMMON/etc/monitrc
+        stop-command: usr/bin/monit -c $SNAP_COMMON/etc/monitrc quit
+        adapter: none
+        daemon: simple
+        plugs:
+            - process-control
+            - system-observe
+
+    help:
+        command: bin/snap-help
+        adapter: none
+
+
 
