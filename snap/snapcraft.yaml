@@ -138,6 +138,18 @@ apps:
             - firewall-control
 
 parts:
+    # use zulu for build
+    build-jdk:
+        plugin: dump
+        source:
+            - on armhf: https://cdn.azul.com/zulu-embedded/bin/zulu8.42.0.195-ca-jdk1.8.0_232-linux_aarch32hf.tar.gz
+            - on arm64: https://cdn.azul.com/zulu-embedded/bin/zulu8.42.0.195-ca-jdk1.8.0_232-linux_aarch64.tar.gz
+            - on amd64: https://cdn.azul.com/zulu/bin/zulu8.42.0.23-ca-jdk8.0.232-linux_x64.tar.gz
+        organize:
+            '*': build-jdk/
+        prime:
+            - '-*'
+
     kura:
         plugin: kura
         source: https://github.com/kubiko/kura.git
