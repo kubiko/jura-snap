@@ -30,6 +30,22 @@ hooks:
       plugs:
           - network-setup-control
 
+layout:
+    /etc/sysconfig:
+        bind: $SNAP_COMMON/etc/sysconfig
+    /etc/bind:
+        bind: $SNAP_COMMON/etc/bind
+    /etc/dhcp:
+        bind: $SNAP_COMMON/etc/dhcp
+    /etc/hostapd:
+        bind: $SNAP_COMMON/etc/hostapd
+    /etc/network:
+        bind: $SNAP_COMMON/etc/network
+    /etc/adjtime:
+        bind-file: $SNAP_COMMON/etc/adjtime
+    /var/lib/dhclient:
+        bind: $SNAP_DATA/var/lib/dhclient
+
 apps:
     kura:
         command: kura/bin/start_kura_snap.sh
