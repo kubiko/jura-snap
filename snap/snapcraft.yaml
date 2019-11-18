@@ -98,12 +98,12 @@ parts:
         override-pull: |
             case ${SNAPCRAFT_PROJECT_NAME} in
                 *-nn)
-                  wget https://people.canonical.com/~okubik/kura_SNAPSHOT_ubuntu-snap-nn.zip \
-                       -O ${SNAPCRAFT_PART_SRC}/kura_SNAPSHOT_ubuntu-snap-nn.zip
+                  wget https://people.canonical.com/~okubik/kura_RELEASE_ubuntu-snap-nn.zip
+                       -O ${SNAPCRAFT_PART_SRC}/kura_RELEASE_ubuntu-snap-nn.zip
                   ;;
                 *)
-                  wget https://people.canonical.com/~okubik/kura_SNAPSHOT_ubuntu-snap.zip \
-                       -O ${SNAPCRAFT_PART_SRC}/kura_SNAPSHOT_ubuntu-snap.zip
+                  wget https://people.canonical.com/~okubik/kura_RELEASE_ubuntu-snap.zip
+                       -O ${SNAPCRAFT_PART_SRC}/kura_RELEASE_ubuntu-snap.zip
                   ;;
             esac
         override-build: |
