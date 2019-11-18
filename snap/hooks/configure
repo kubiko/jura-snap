@@ -1,0 +1,27 @@
+#!/bin/bash
+
+hook_name=$(basename $0)
+
+exec >> ${SNAP_DATA}/hook-${hook_name}.log 2>&1
+echo "$(date '+%Y-%m-%d %H:%M:%S'): Entering ${hook_name} hook"
+echo "SNAP_REVISION=${SNAP_REVISION}"
+
+# callback function to process settings in file
+# apply_settings ${key} ${file} ${conf} ${value} ${default} ${description}
+apply_settings() {
+    local conf=${3}
+    local file=$(eval echo ${2})
+    local val=${4}
+    [ -z "${val}" ] && val=${5}
+    if [ -f ${file} ]; then
+        sed -i 's/.*'"${conf}"'.*/'"${conf}"''"${val}"'/g' ${file}
+    fi
+}
+
+# read snap config settings
+source ${SNAP}/bin/snap-config
+read_snap_config
+
+echo "Restart kura service, as we  have new settings"
+snapctl restart ${SNAP_NAME}.kura
+
