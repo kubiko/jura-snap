@@ -88,26 +88,32 @@ apps:
 
 parts:
     kura:
-        plugin: nil
+        plugin: kura
+        source: https://github.com/kubiko/kura.git
+        source-branch: develop-snap
+        after:
+            - build-jdk
         build-packages:
             - unzip
             - maven
             - gawk
             - zip
-            - wget
-        override-pull: |
-            case ${SNAPCRAFT_PROJECT_NAME} in
-                *-nn)
-                  wget https://people.canonical.com/~okubik/kura_SNAPSHOT_ubuntu-snap-nn.zip \
-                       -O ${SNAPCRAFT_PART_SRC}/kura_SNAPSHOT_ubuntu-snap-nn.zip
-                  ;;
-                *)
-                  wget https://people.canonical.com/~okubik/kura_SNAPSHOT_ubuntu-snap.zip \
-                       -O ${SNAPCRAFT_PART_SRC}/kura_SNAPSHOT_ubuntu-snap.zip
-                  ;;
-            esac
+        maven-openjdk-version: "8"
+        maven-options:
+            - '-Pubuntu-snap'
+            - -B
+            - -Dmaven.test.skip=true
+            - -DskipTest=1
+        maven-targets:
+            - target-platform
+            - kura
+            - kura/distrib
         override-build: |
-            KURA_DIST_TARGET_DIR=${SNAPCRAFT_PART_BUILD}
+            # use build-jdk instead
+            export BUILD_JDK=${SNAPCRAFT_STAGE}/build-jdk/bin
+            export JAVA_HOME=${SNAPCRAFT_STAGE}/build-jdk
+            snapcraftctl build
+            KURA_DIST_TARGET_DIR=${SNAPCRAFT_PART_BUILD}/kura/distrib/target/
             case ${SNAPCRAFT_PROJECT_NAME} in
                 *-nn)
                   unzip ${KURA_DIST_TARGET_DIR}/kura_*_ubuntu-snap-nn.zip -d ${SNAPCRAFT_PART_INSTALL}/
