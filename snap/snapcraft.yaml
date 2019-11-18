@@ -19,6 +19,17 @@ environment:
     LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$SNAP_LIBRARY_PATH:$SNAP/lib/${SNAPCRAFT_ARCH_TRIPLET}:$SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}:$LD_LIBRARY_PATH
     KURA_NET: "true"
 
+hooks:
+    install:
+      plugs:
+          - network-setup-control
+    post-refresh:
+      plugs:
+          - network-setup-control
+    remove:
+      plugs:
+          - network-setup-control
+
 apps:
     kura:
         command: kura/bin/start_kura_snap.sh
