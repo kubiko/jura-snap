@@ -13,4 +13,9 @@ grade: stable
 adopt-info: kura
 base: core18
 
+environment:
+    JAVA_HOME: $SNAP/jre
+    PATH: $SNAP/jre/bin:$SNAP/usr/sbin:$SNAP/usr/bin:$SNAP/sbin:$SNAP/bin:$PATH
+    LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$SNAP_LIBRARY_PATH:$SNAP/lib/${SNAPCRAFT_ARCH_TRIPLET}:$SNAP/usr/lib/${SNAPCRAFT_ARCH_TRIPLET}:$LD_LIBRARY_PATH
+
 
