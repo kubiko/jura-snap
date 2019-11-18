@@ -86,4 +86,126 @@ apps:
         adapter: none
 
 
+parts:
+    tools:
+        plugin: nil
+        stage-packages:
+            - to armhf:
+                - bash:armhf
+                - bluez:armhf
+                - coreutils:armhf
+                - dbus:armhf
+                - dos2unix:armhf
+                - dpkg:armhf
+                - fdisk:armhf
+                - inetutils-telnet:armhf
+                - iproute2:armhf
+                - jq:armhf
+                - kmod:armhf
+                - minicom:armhf
+                - monit:armhf
+                - nano:armhf
+                - setserial:armhf
+                - openvpn:armhf
+                - powertop:armhf
+                - socat:armhf
+                - telnet:armhf
+                - usbutils:armhf
+                - unzip:armhf
+                - libasound2:armhf
+                - libatm1:armhf
+                - libcap-ng0:armhf
+                - libdbus-1-3:armhf
+                - libexpat1:armhf
+                - libfdisk1:armhf
+                - libmnl0:armhf
+                - libudev1:armhf
+                - libx11-6:armhf
+                - libxau6:armhf
+                - libxcb1:armhf
+                - libxdmcp6:armhf
+                - libxext6:armhf
+                - libxi6:armhf
+                - libxrender1:armhf
+                - libxtables12:armhf
+                - libxtst6:armhf
+            - to arm64:
+                - bash:arm64
+                - bluez:arm64
+                - coreutils:arm64
+                - dbus:arm64
+                - dos2unix:arm64
+                - dpkg:arm64
+                - fdisk:arm64
+                - inetutils-telnet:arm64
+                - iproute2:arm64
+                - jq:arm64
+                - kmod:arm64
+                - minicom:arm64
+                - monit:arm64
+                - nano:arm64
+                - setserial:arm64
+                - openvpn:arm64
+                - powertop:arm64
+                - socat:arm64
+                - telnet:arm64
+                - usbutils:arm64
+                - unzip:arm64
+                - libasound2:arm64
+                - libatm1:arm64
+                - libcap-ng0:arm64
+                - libdbus-1-3:arm64
+                - libexpat1:arm64
+                - libfdisk1:arm64
+                - libmnl0:arm64
+                - libudev1:arm64
+                - libx11-6:arm64
+                - libxau6:arm64
+                - libxcb1:arm64
+                - libxdmcp6:arm64
+                - libxext6:arm64
+                - libxi6:arm64
+                - libxrender1:arm64
+                - libxtables12:arm64
+                - libxtst6:arm64
+            - to amd64:
+                - bash:amd64
+                - bluez:amd64
+                - coreutils:amd64
+                - dbus:amd64
+                - dos2unix:amd64
+                - dpkg:amd64
+                - fdisk:amd64
+                - inetutils-telnet:amd64
+                - iproute2:amd64
+                - jq:amd64
+                - kmod:amd64
+                - minicom:amd64
+                - monit:amd64
+                - nano:amd64
+                - setserial:amd64
+                - openvpn:amd64
+                - powertop:amd64
+                - socat:amd64
+                - telnet:amd64
+                - usbutils:amd64
+                - unzip:amd64
+                - libasound2:amd64
+                - libatm1:amd64
+                - libcap-ng0:amd64
+                - libdbus-1-3:amd64
+                - libexpat1:amd64
+                - libfdisk1:amd64
+                - libmnl0:amd64
+                - libudev1:amd64
+                - libx11-6:amd64
+                - libxau6:amd64
+                - libxcb1:amd64
+                - libxdmcp6:amd64
+                - libxext6:amd64
+                - libxi6:amd64
+                - libxrender1:amd64
+                - libxtables12:amd64
+                - libxtst6:amd64
+
 
